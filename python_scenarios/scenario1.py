@@ -54,7 +54,7 @@ boiler_states.append(init_boiler_states)
 
 # In order to test the algorithm, we simulate the power excess (P_PV - P_nc)
 excess = pd.read_excel('data_input/Energie - 00003 - Pache.xlsx', index_col=[0], usecols=[0, 1])
-excess['P_PV - P_nc (kW)'] = excess['Flux energie au point d\'injection (kWh)'] * -6  # Convert the energy (kWh) to power (kW) and power convention (buy positive and sell negative)
+excess['P_PV - P_nc (kW)'] = excess['Flux energie au point d\'injection (kWh)'] * 6  # Convert the energy (kWh) to power (kW) and power convention (buy positive and sell negative)
 del excess['Flux energie au point d\'injection (kWh)']  # we do not need the energy column anymore
 
 
