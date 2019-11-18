@@ -30,7 +30,7 @@ def algo_scenario1(boiler_states, p_x):
             p_x = p_x - state[POWER] + u_B[boiler]
         else:
             if p_x > 0:
-                error_Temp = max(0, B_TMAX - boiler[TEMP])
+                error_Temp = max(0, B_TMAX - state[TEMP])
                 u_B[boiler] = max(-C_B * error_Temp / (Dt / 60), B_PMAX, -(p_x - state[POWER]))
                 p_x = p_x - state[POWER] + u_B[boiler]
     print('u_B = ', u_B)
