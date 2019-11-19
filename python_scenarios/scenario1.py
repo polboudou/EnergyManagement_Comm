@@ -18,7 +18,7 @@ T_AMB = 22              # ambient temperature (degrees celsius)
 t_HL = 400              # time constant for heat loss (min)
 
 
-
+# Control algorithm
 def algo_scenario1(boiler_states, p_x):
 
     u_B = {1: 0, 2: 0}
@@ -52,7 +52,7 @@ init_boiler_states = {1: [T_B1, p_B1], 2: [T_B2, p_B2]}
 boiler_states.append(init_boiler_states)
 
 
-# In order to test the algorithm, we simulate the power excess (P_PV - P_nc)
+# Data acquisition. Simulation of daily power excess (P_PV - P_nc)
 excess = pd.read_excel('data_input/Energie - 00003 - Pache.xlsx', index_col=[0], usecols=[0, 1])
 excess['P_PV - P_nc (kW)'] = excess['Flux energie au point d\'injection (kWh)'] * 6  # Convert the energy (kWh) to power (kW) and power convention (buy positive and sell negative)
 del excess['Flux energie au point d\'injection (kWh)']  # we do not need the energy column anymore
