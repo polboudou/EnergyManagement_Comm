@@ -68,7 +68,7 @@ def get_excess_power_forecast():
     end_index = start_index + timedelta(minutes=HORIZON - TIME_SLOT)
     excess_power_forecast_df = df.loc[start_index:end_index]
     excess_power_forecast_df.plot.line(y='excess_power (kW) (Psolar - Pload)')
-    plt.savefig('figs_output_mpc/power_profile_at_connection_point.pdf')
+    plt.savefig('data_output/figs_mpc_battery/power_profile_at_connection_point.pdf')
     return excess_power_forecast_df
 
 
@@ -76,21 +76,21 @@ def get_hot_water_usage_forecast():
     df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx',
                        index_col=[0], usecols=[0, 1])
     df.plot.line(y='Hot water usage (litres)')
-    plt.savefig('figs_output_mpc/hot_water_usage_profile_24hrs.pdf')
+    plt.savefig('data_output/figs_mpc_battery/hot_water_usage_profile_24hrs.pdf')
     return df
 
 
 def get_energy_sell_price():
     df = pd.read_excel('data_input/energy_sell_price_10min_granularity.xlsx', index_col=[0], usecols=[0, 1])
     df.plot.line(y='Sell Price (CHF / kWh)')
-    plt.savefig('figs_output_mpc/energy_sell_price_24hrs.pdf')
+    plt.savefig('data_output/figs_mpc_battery/energy_sell_price_24hrs.pdf')
     return df
 
 
 def get_energy_buy_price():
     df = pd.read_excel('data_input/energy_buy_price_10min_granularity.xlsx', index_col=[0], usecols=[0, 1])
     df.plot.line(y='Buy Price (CHF / kWh)')
-    plt.savefig('figs_output_mpc/energy_buy_price_24hrs.pdf')
+    plt.savefig('data_output/figs_mpc_battery/energy_buy_price_24hrs.pdf')
     return df
 
 
@@ -111,7 +111,7 @@ def main():
         [excess_power_forecast_df, hot_water_usage_forecast_df, energy_sell_price_df, energy_buy_price_df], axis=1)
     # concated_df.plot.line(y=['power_pcc (kW) (+ import)', 'Hot water usage (litres)'], secondary_y=['Sell Price (CHF / kWh)', 'Buy Price (CHF / kWh)'])
     concated_df.plot.line(secondary_y=['Sell Price (CHF / kWh)', 'Buy Price (CHF / kWh)'])
-    plt.savefig('figs_output_mpc/disturbances_and_energy_prices.pdf')
+    plt.savefig('data_output/figs_mpc_battery/disturbances_and_energy_prices.pdf')
     # plt.show()
     # exit()
 
@@ -322,7 +322,7 @@ def main():
     results_df.plot.line(secondary_y=['temp_boiler1 (°C)', 'temp_boiler2 (°C)'], ax=axes[0], figsize=(10,15))
     soc_result_df.plot.line(ax=axes[1])
     energy_buy_price_df.plot.line(ax=axes[1], secondary_y=True)
-    plt.savefig('figs_output_mpc/results_mpc_battery.pdf')
+    plt.savefig('data_output/figs_mpc_battery/results_mpc_battery.pdf')
 
 # plt.show()
 
