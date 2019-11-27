@@ -37,8 +37,8 @@ BATTERY_INITIAL_SOC = 200                   # in Watts
 no_slots = int(HORIZON / TIME_SLOT)
 
 if __name__ == '__main__':
-    print('Starting simulation!')
 
+    print('Starting simulation!')
     #launch both models executable and controller executable
     subprocess.run("python3 models.py & python3 controller.py", shell=True)
 
