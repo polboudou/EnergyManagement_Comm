@@ -51,7 +51,6 @@ def algo_scenario2(boiler_states, p_x):
     #u_B = {1: 0, 2: 0}
     u_B = {1: 0}
     p_x = p_x + boiler_states[1][POWER] #+ boiler_states[2][POWER]
-    print("px considering boilers:", p_x)
     boiler_states_sorted = sorted(boiler_states.items(), key=operator.itemgetter(1))
     for (boiler, state) in boiler_states_sorted:
 

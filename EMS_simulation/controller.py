@@ -1,12 +1,14 @@
 
 
 import pandas as pd
+import numpy as np
 import paho.mqtt.client as mqtt # import the client
 import time
 #from EMS_simulation.control_algorithms import scenario1, scenario2, scenario3
 from EMS_simulation.control_algorithms import scenario2
-broker_address = "mqtt.eclipse.org"  # use external broker
+broker_address = "test.mosquitto.org"  # use external broker
 
+FORECAST_INACCURACY_COEF = 0.1  # 0 for perfect accuracy, 1 for big inaccuracy
 
 class Controller():
     def __init__(self, description):
@@ -35,8 +37,29 @@ class Controller():
         client.loop_start()  # without the loop, the call back functions dont get processed
         return client
 
-# callback functions for communication
+def Initialise_client_object():
+    mqtt.Client.last_pub_time = time.time()
+    mqtt.Client.topic_ack = []
+    mqtt.Client.run_control_flag = False
 
+def get_excess_power_forecast():
+    # Data acquisition. Simulation of daily power excess (P_PV - P_nc)
+    excess = pd.read_excel('data_input/Energie - 00003 - Pache.xlsx', index_col=[0], usecols=[0, 1])
+    excess['P_PV - P_nc (kW)'] = excess[
+                                     'Flux energie au point d\'injection (kWh)'] * 6  # Convert the energy (kWh) to power (kW) and power convention (buy positive and sell negative)
+    del excess['Flux energie au point d\'injection (kWh)']  # we do not need the energy column anymore
+    return excess['P_PV - P_nc (kW)']
+
+
+def get_excess_power_simulation(p_x_forecast):
+    # random samples from a uniform distribution around 0
+    p_x_forecast = np.array(p_x_forecast)
+    mean_px = np.nanmean(np.array(p_x_forecast))
+    p_x = p_x_forecast + FORECAST_INACCURACY_COEF*mean_px*np.random.normal(size=len(p_x_forecast))
+    return(p_x)
+
+
+# callback functions for communication
 def on_log(client, userdata, level, buf):
     print("log: ",buf)
 
@@ -47,15 +70,17 @@ def on_connect(client, userdata, flags, rc):
         print('bad connection Returned code=', rc)
 
 def on_disconnect(client, userdata, flags, rc=0):
-    print('disconnected')
+    print('controller disconnected')
 
 def on_message_controller(client, userdata, msg):
     message_handler(client, msg)
 
 def message_handler(client, msg):
-    if msg.topic == 'boiler_sensor':
+    if msg.topic == 'boiler_sensor/power':
+        controller.pb1 = float(msg.payload)
+
+    if msg.topic == 'boiler_sensor/temp':
         controller.Tb1 = float(msg.payload)
-        print('received measurements from boiler 1:', float(msg.payload))
 
 
 TIME_SLOT = 10  # in minutes
@@ -79,21 +104,29 @@ BOILER2_VOLUME = 800  # in litres
 BOILER1_INITIAL_TEMP = 45  # in degree celsius (TODO would come from the measurements!)
 BOILER2_INITIAL_TEMP = 45  # in degree celsius (TODO would come from the measurements)
 
-px = 2000
+
+p_x_f = get_excess_power_forecast()
+p_x = get_excess_power_simulation(p_x_f)
 
 if __name__ == '__main__':
 
     print('Instantiating controller!')
     controller = Controller('SC1')
+    #p_x_forecast = get_excess_power_forecast()
+    #p_x = get_excess_power_simulation(p_x_f)
     controller.client.subscribe("boiler_sensor")
-    for i in range(2):
-        time.sleep(2) # to ensure that all units are instantiated
+    controller.client.subscribe("boiler_sensor/temp")
+    controller.client.subscribe("boiler_sensor/power")
+    for h in range(20):
         controller.client.publish('boiler', 'Request measurement')
-        time.sleep(1)
+        time.sleep(0.2) # to ensure that all units are instantiated
         print('controller.pb1', controller.pb1)
         print('controller.Tb1', controller.Tb1)
-        actions = controller.run_algorithm(px)
+        #if controller.client.flag == 1:
+        actions = controller.run_algorithm(p_x[h])
+        print(str(actions[1]))
         controller.client.publish('boiler_actuator', str(actions[1]))
 
+    controller.client.publish('boiler', 'End')
     controller.client.loop_stop()
     controller.client.disconnect(broker_address)
