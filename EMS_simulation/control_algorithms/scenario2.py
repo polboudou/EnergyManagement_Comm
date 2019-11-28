@@ -36,8 +36,8 @@ BOILER2_TEMP_MAX = 60  # in degree celsius
 
 BOILER2_TEMP_INCOMING_WATER = 20  # in degree celsius (TODO to be verified!) Question: is it variable?
 
-BOILER1_RATED_P = 7600  # in Watts
-BOILER2_RATED_P = 7600  # in Watts
+BOILER1_RATED_P = -7600  # in Watts
+BOILER2_RATED_P = -7600  # in Watts
 
 BOILER1_VOLUME = 800  # in litres
 BOILER2_VOLUME = 800  # in litres
@@ -55,12 +55,20 @@ def algo_scenario2(boiler_states, p_x):
     for (boiler, state) in boiler_states_sorted:
 
         if state[HYST] == 1:
-            u_B[boiler] = B_PMAX
+            u_B[boiler] = BOILER1_RATED_P
             p_x = p_x - state[POWER] + u_B[boiler]
         else:
             if p_x > 0:
                 error_Temp = max(0, BOILER1_TEMP_MAX - state[TEMP])
                 u_B[boiler] = max(-C_B * error_Temp / (DT / 60), BOILER1_RATED_P, -(p_x - state[POWER]))
                 p_x = p_x - state[POWER] + u_B[boiler]
+
+        if state[TEMP] >= T_DELTA:
+            state[HYST] = 0
+        elif state[TEMP] <= B_TMIN:
+            state[HYST] = 1
+        else:
+            state[HYST] = state[HYST]
+
     return u_B
 
