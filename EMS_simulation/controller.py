@@ -2,6 +2,7 @@
 
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 import paho.mqtt.client as mqtt # import the client
 import time
 #from EMS_simulation.control_algorithms import scenario1, scenario2, scenario3
@@ -19,11 +20,17 @@ class Controller():
             self.Tb1 = 0
             self.pb1 = 0
             self.sb1 = 0
+            self.Tb1_list = []
+            self.pb1_list = []
+            self.sb1_list = []
             #self.states = [0]*2     # [T_B1, p_B1]
             #self.states[1] = 0
             self.algorithm = 'scenario1'
 
     def run_algorithm(self, p_x):
+        self.Tb1_list.append(self.Tb1)
+        self.pb1_list.append(self.pb1)
+        self.sb1_list.append(self.sb1)
         action = scenario2.algo_scenario2({1: [self.Tb1, self.pb1, self.sb1]}, p_x)
         return action
 
@@ -46,7 +53,7 @@ def get_excess_power_forecast():
     # Data acquisition. Simulation of daily power excess (P_PV - P_nc)
     excess = pd.read_excel('data_input/Energie - 00003 - Pache.xlsx', index_col=[0], usecols=[0, 1])
     excess['P_PV - P_nc (kW)'] = excess[
-                                     'Flux energie au point d\'injection (kWh)'] * 6  # Convert the energy (kWh) to power (kW) and power convention (buy positive and sell negative)
+                                     'Flux energie au point d\'injection (kWh)'] * 6 * 1000  # Convert the energy (kWh) to power (W) and power convention (buy positive and sell negative)
     del excess['Flux energie au point d\'injection (kWh)']  # we do not need the energy column anymore
     return excess['P_PV - P_nc (kW)']
 
@@ -82,6 +89,9 @@ def message_handler(client, msg):
     if msg.topic == 'boiler_sensor/temp':
         controller.Tb1 = float(msg.payload)
 
+    if msg.topic == 'boiler_sensor/hysteresis':
+        controller.sb1 = float(msg.payload)
+
 
 TIME_SLOT = 10  # in minutes
 # HORIZON = 20 # in minutes, corresponds to 24 hours
@@ -95,8 +105,8 @@ BOILER2_TEMP_MAX = 60  # in degree celsius
 
 BOILER2_TEMP_INCOMING_WATER = 20  # in degree celsius (TODO to be verified!) Question: is it variable?
 
-BOILER1_RATED_P = 7600  # in Watts
-BOILER2_RATED_P = 7600  # in Watts
+BOILER1_RATED_P = -7600  # in Watts
+BOILER2_RATED_P = -7600  # in Watts
 
 BOILER1_VOLUME = 800  # in litres
 BOILER2_VOLUME = 800  # in litres
@@ -104,29 +114,40 @@ BOILER2_VOLUME = 800  # in litres
 BOILER1_INITIAL_TEMP = 45  # in degree celsius (TODO would come from the measurements!)
 BOILER2_INITIAL_TEMP = 45  # in degree celsius (TODO would come from the measurements)
 
-
-p_x_f = get_excess_power_forecast()
-p_x = get_excess_power_simulation(p_x_f)
+SIMU_STEPS = 6*24
 
 if __name__ == '__main__':
 
     print('Instantiating controller!')
     controller = Controller('SC1')
-    #p_x_forecast = get_excess_power_forecast()
-    #p_x = get_excess_power_simulation(p_x_f)
+    p_x_forecast = get_excess_power_forecast()
+    p_x = get_excess_power_simulation(p_x_forecast)
     controller.client.subscribe("boiler_sensor")
     controller.client.subscribe("boiler_sensor/temp")
     controller.client.subscribe("boiler_sensor/power")
-    for h in range(20):
+    controller.client.subscribe("boiler_sensor/hysteresis")
+    for h in range(SIMU_STEPS):
         controller.client.publish('boiler', 'Request measurement')
-        time.sleep(0.2) # to ensure that all units are instantiated
+        time.sleep(0.1) # to ensure that all units are instantiated
         print('controller.pb1', controller.pb1)
         print('controller.Tb1', controller.Tb1)
+        print('controller.Tb1', controller.sb1)
         #if controller.client.flag == 1:
-        actions = controller.run_algorithm(p_x[h])
-        print(str(actions[1]))
+        actions = controller.run_algorithm(p_x_forecast[h])
         controller.client.publish('boiler_actuator', str(actions[1]))
 
     controller.client.publish('boiler', 'End')
     controller.client.loop_stop()
     controller.client.disconnect(broker_address)
+
+    fig, axes = plt.subplots(2, 1)
+    axes[0].plot(range(SIMU_STEPS), controller.pb1_list, label = 'Power')
+    ax2 = axes[0].twinx()
+    ax2.plot(range(SIMU_STEPS), controller.Tb1_list, label = 'Temperature', color='red')
+    axes[1].plot(range(SIMU_STEPS), controller.sb1_list, label = 'Hysteresis state')
+    plt.legend()
+    ax2.legend(loc=2)
+    axes[0].legend(loc=1)
+    axes[1].legend()
+    plt.savefig('simu_output/results_simu_'+controller.description+'.pdf')
+

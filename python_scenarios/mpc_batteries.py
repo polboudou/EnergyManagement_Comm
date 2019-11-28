@@ -213,6 +213,7 @@ def main():
             row = [0] * no_ctrl_vars
             row[x * NO_CTRL_VARS_PS + 5] = 1
             row[x * NO_CTRL_VARS_PS + 3] = -Bb2
+            print("PERONOOOOOOO ", -Bb2)
             # print (row)
             A_eq.append(row)
             # print (A_ub)
