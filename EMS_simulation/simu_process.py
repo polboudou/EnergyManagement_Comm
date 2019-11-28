@@ -15,7 +15,7 @@ BOILER1_TEMP_MAX = 50  # in degree celsius
 BOILER2_TEMP_MIN = 30  # in degree celsius
 BOILER2_TEMP_MAX = 60  # in degree celsius
 
-BOILER2_TEMP_INCOMING_WATER = 20  # in degree celsius (TODO to be verified!) Question: is it variable?
+BOILER2_TEMP_INCOMING_WATER = 20  # in degree celsius
 
 BOILER1_RATED_P = 7600  # in Watts
 BOILER2_RATED_P = 7600  # in Watts
@@ -23,8 +23,8 @@ BOILER2_RATED_P = 7600  # in Watts
 BOILER1_VOLUME = 800  # in litres
 BOILER2_VOLUME = 800  # in litres
 
-BOILER1_INITIAL_TEMP = 45  # in degree celsius (TODO would come from the measurements!)
-BOILER2_INITIAL_TEMP = 45  # in degree celsius (TODO would come from the measurements)
+BOILER1_INITIAL_TEMP = 45  # in degree celsius
+BOILER2_INITIAL_TEMP = 45  # in degree celsius
 
 BATTERY_SOC_MAX = 5000 * 60                 # in Watts min
 BATTERY_SOC_MIN = 100 * 60                  # in Watts min
@@ -39,8 +39,8 @@ no_slots = int(HORIZON / TIME_SLOT)
 if __name__ == '__main__':
 
     print('Starting simulation!')
-    #launch both models executable and controller executable
-    subprocess.run("python3 models.py & python3 controller.py", shell=True)
+    subprocess.run("python3 models.py & python3 boiler2_model.py & python3 controller.py", shell=True)
+    #subprocess.run("python3 models.py & python3 controller.py", shell=True)
 
 
 
