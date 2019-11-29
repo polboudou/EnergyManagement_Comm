@@ -76,6 +76,30 @@ def algo_scenario2(boiler_states, p_x):
     outputs = {'actions': u_B, 'hyst_states': hyst_states}
     return outputs
 
+def algo_scenario0(boiler_states):
+    '''
+    :param boiler_states:
+    :return: supplies boilers when they reach their lower temperature bounds (thermostat type)
+    '''
+    u_B = {1: 0, 2: 0}
+    hyst_states = {1: 0, 2:0}
+    boiler_states_sorted = sorted(boiler_states.items(), key=operator.itemgetter(1))
+    for (boiler, state) in boiler_states_sorted:
+
+        if state[HYST] == 1:
+            u_B[boiler] = BOILERS_RATED_P[boiler]
+
+        if state[TEMP] >= BOILERS_TEMP_DELTA[boiler]:
+            hyst_states[boiler] = 0
+        elif state[TEMP] <= BOILERS_TEMP_MIN[boiler]:
+            hyst_states[boiler] = 1
+        else:
+            hyst_states[HYST] = state[HYST]
+
+    outputs = {'actions': u_B, 'hyst_states': hyst_states}
+    return outputs
+
+
 def algo_scenario1(boiler_states, p_x):
 
     u_B = {1: 0, 2: 0}
