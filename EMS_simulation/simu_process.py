@@ -1,5 +1,5 @@
 
-from EMS_simulation import models
+from EMS_simulation import boiler1_model
 from EMS_simulation import controller
 
 import subprocess
@@ -39,8 +39,8 @@ no_slots = int(HORIZON / TIME_SLOT)
 if __name__ == '__main__':
 
     print('Starting simulation!')
-    subprocess.run("python3 models.py & python3 boiler2_model.py & python3 controller.py", shell=True)
-    #subprocess.run("python3 models.py & python3 controller.py", shell=True)
+    subprocess.run("python3 boiler1_model.py & python3 boiler2_model.py & python3 controller.py", shell=True)
+    #subprocess.run("python3 boiler1_model.py & python3 controller.py", shell=True)
 
 
 
