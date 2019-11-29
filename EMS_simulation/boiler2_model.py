@@ -1,11 +1,23 @@
 
 import pandas as pd
+import random
 import paho.mqtt.client as mqtt # import the client
 import time
 
-BOILER1_VOLUME = 800    # in litres
-BOILER_TEMP_INCOMING_WATER = 20  # (degrees celsius)
-TIME_SLOT = 10
+TIME_SLOT = 10  # in minutes
+# HORIZON = 20 # in minutes, corresponds to 24 hours
+HORIZON = 1440  # in minutes, corresponds to 24 hours
+
+BOILER2_TEMP_MIN = 30  # in degree celsius
+BOILER2_TEMP_MAX = 60  # in degree celsius
+BOILER2_TEMP_DELTA = 35
+BOILER2_TEMP_INCOMING_WATER = 20  # in degree celsius
+
+BOILER2_RATED_P = -7600  # in Watts
+BOILER2_VOLUME = 800  # in litres
+
+BOILER2_INITIAL_TEMP = 45  # in degree celsius
+
 broker_address = "mqtt.teserakt.io"  # use external broker (alternative: test.mosquitto.org
 
 
@@ -25,23 +37,11 @@ class Boiler():
 
     def model(self):
         # T[h+1] = A * T[h] + C * P[h] + D * T_inlet[h]
-        C = (self.dt * 60) / \
-                    (4.186 * 997 * BOILER2_VOLUME)  # boiler thermal capacity (K/Watt)  #(C_water = 4.186 watt-second per gram per degree celsius, water density is 997 grams / litre)
-
+        C = (self.dt * 60) / (4.186 * 997 * BOILER2_VOLUME)
+        print("charlie, estamos aumentando la temperatura en el 2!")
         A = 1 - self.hot_water_usage[self.time_step][0] / BOILER2_VOLUME
         D = self.hot_water_usage[self.time_step][0] / BOILER2_VOLUME
-        # print("temp ", self.current_temp)
-        # print("CCCCCCCCCCC ", C*self.power)
-        # print("AAAAAAAAAA ", A*self.current_temp)
-        # print("DDDDD ", D*BOILER_TEMP_INCOMING_WATER)
-        self.current_temp = A * self.current_temp - C * self.power + D * BOILER_TEMP_INCOMING_WATER
-
-        if self.current_temp >= BOILER2_TEMP_DELTA:
-            self.hysteresis = 0
-        elif self.current_temp <= BOILER2_TEMP_MIN:
-            self.hysteresis = 1
-        else:
-            self.hysteresis = self.hysteresis
+        self.current_temp = A * self.current_temp - C * self.power + D * BOILER2_TEMP_INCOMING_WATER
 
         self.time_step += 1
 
@@ -61,7 +61,7 @@ def get_hot_water_usage_simu():
                        usecols=[0, 1])
     # df.plot.line(y='Hot water usage (litres)')
     # plt.savefig('../../figs_output/hot_water_usage_profile_24hrs.pdf')
-    hot_water_usage_list = df.values / 20  # for test purposes, otherwise too big.
+    hot_water_usage_list = df.values / 3  # for test purposes, otherwise too big.
     return hot_water_usage_list
 
 
@@ -69,7 +69,6 @@ def get_hot_water_usage_simu():
 
 def on_log(client, userdata, level, buf):
     print("log: ", buf)
-
 
 def on_connect(client, userdata, flags, rc):
     if rc == 0:
@@ -81,48 +80,29 @@ def on_connect(client, userdata, flags, rc):
 def on_disconnect(client, userdata, flags, rc=0):
     print('boiler2 disconnected')
 
-
 def on_message_boiler(client, userdata, msg):
     m_decode = str(msg.payload.decode("utf-8", "ignore"))
     if m_decode == 'Request measurement':
         client.publish('boiler2_sensor/temp', boiler2.current_temp)
         client.publish('boiler2_sensor/power', boiler2.power)
-        client.publish('boiler2_sensor/hysteresis', boiler2.hysteresis)
 
     if m_decode == 'End':
         print("this is the end of boiler 2")
         client.disconnect(broker_address)
     message_handler(client, msg)
 
-
 def message_handler(client, msg):
     if msg.topic == 'boiler2_actuator':
+        print("msg.payload ", msg.payload)
         boiler2.power = float(msg.payload)
         boiler2.model()
 
 
-TIME_SLOT = 10  # in minutes
-# HORIZON = 20 # in minutes, corresponds to 24 hours
-HORIZON = 1440  # in minutes, corresponds to 24 hours
-
-BOILER2_TEMP_MIN = 30  # in degree celsius
-BOILER2_TEMP_MAX = 60  # in degree celsius
-BOILER2_TEMP_DELTA = 35
-BOILER2_TEMP_INCOMING_WATER = 20  # in degree celsius
-
-BOILER1_RATED_P = -7600  # in Watts
-BOILER2_RATED_P = -7600  # in Watts
-
-BOILER1_VOLUME = 800  # in litres
-BOILER2_VOLUME = 800  # in litres
-
-BOILER1_INITIAL_TEMP = 45  # in degree celsius
-BOILER2_INITIAL_TEMP = 45  # in degree celsius
-
 if __name__ == '__main__':
     print('Instantiating boiler 2 entity!')
-
-    boiler2 = Boiler('Boiler2', TIME_SLOT, BOILER2_RATED_P, BOILER2_TEMP_MIN, BOILER2_TEMP_MAX, BOILER2_INITIAL_TEMP)
+    r = random.randrange(1, 100)
+    cname = "Boiler1-" + str(r)     # broker doesn't like when two clients with same name connect
+    boiler2 = Boiler(cname, TIME_SLOT, BOILER2_RATED_P, BOILER2_TEMP_MIN, BOILER2_TEMP_MAX, BOILER2_INITIAL_TEMP)
     # print('boiler1.current_temp', boiler1.current_temp)
 
     boiler2.client.subscribe("boilers")
