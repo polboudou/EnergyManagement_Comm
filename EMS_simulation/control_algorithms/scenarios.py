@@ -29,7 +29,7 @@ BOILERS_TEMP_MAX={1: BOILER1_TEMP_MAX, 2: BOILER2_TEMP_MAX}
 BOILERS_TEMP_MIN={1: BOILER1_TEMP_MIN, 2: BOILER2_TEMP_MIN}
 BOILERS_TEMP_DELTA = {1: BOILER1_TEMP_DELTA, 2: BOILER2_TEMP_DELTA}
 
-BOILER2_TEMP_INCOMING_WATER = 20  # in degree celsius (TODO to be verified!) Question: is it variable?
+BOILER2_TEMP_INCOMING_WATER = 20  # in degree celsius
 
 BOILER1_RATED_P = -7600  # in Watts
 BOILER2_RATED_P = -7600  # in Watts
@@ -43,10 +43,12 @@ C_BOILER = (DT * 60) / (4.186 * 997 * BOILER1_VOLUME)   # boiler thermal capacit
 
 
 
+#BOILER1_INITIAL_TEMP = 45  # in degree celsius
+#BOILER2_INITIAL_TEMP = 45  # in degree celsius
 
 
-BOILER1_INITIAL_TEMP = 45  # in degree celsius (TODO would come from the measurements!)
-BOILER2_INITIAL_TEMP = 45  # in degree celsius (TODO would come from the measurements)
+BOILER1_INITIAL_TEMP = 40  # in degree celsius
+BOILER2_INITIAL_TEMP = 30  # in degree celsius
 
 # Control algorithm
 def algo_scenario2(boiler_states, p_x):
@@ -71,15 +73,16 @@ def algo_scenario2(boiler_states, p_x):
         elif state[TEMP] <= BOILERS_TEMP_MIN[boiler]:
             hyst_states[boiler] = 1
         else:
-            hyst_states[HYST] = state[HYST]
+            hyst_states[boiler] = state[HYST]
 
     outputs = {'actions': u_B, 'hyst_states': hyst_states}
     return outputs
 
+
 def algo_scenario0(boiler_states):
     '''
     :param boiler_states:
-    :return: supplies boilers when they reach their lower temperature bounds (thermostat type)
+    :return: supplies boilers when they reach their lower temperature bounds and until they reach upper bounds(thermostat type)
     '''
     u_B = {1: 0, 2: 0}
     hyst_states = {1: 0, 2:0}
@@ -88,6 +91,8 @@ def algo_scenario0(boiler_states):
 
         if state[HYST] == 1:
             u_B[boiler] = BOILERS_RATED_P[boiler]
+        else:
+            u_B[boiler] = 0
 
         if state[TEMP] >= BOILERS_TEMP_DELTA[boiler]:
             hyst_states[boiler] = 0

@@ -38,7 +38,6 @@ class Boiler():
     def model(self):
         # T[h+1] = A * T[h] + C * P[h] + D * T_inlet[h]
         C = (self.dt * 60) / (4.186 * 997 * BOILER2_VOLUME)
-        print("charlie, estamos aumentando la temperatura en el 2!")
         A = 1 - self.hot_water_usage[self.time_step][0] / BOILER2_VOLUME
         D = self.hot_water_usage[self.time_step][0] / BOILER2_VOLUME
         self.current_temp = A * self.current_temp - C * self.power + D * BOILER2_TEMP_INCOMING_WATER
@@ -61,7 +60,7 @@ def get_hot_water_usage_simu():
                        usecols=[0, 1])
     # df.plot.line(y='Hot water usage (litres)')
     # plt.savefig('../../figs_output/hot_water_usage_profile_24hrs.pdf')
-    hot_water_usage_list = df.values / 3  # for test purposes, otherwise too big.
+    hot_water_usage_list = df.values / 2  # for test purposes, otherwise too big.
     return hot_water_usage_list
 
 
@@ -93,14 +92,13 @@ def on_message_boiler(client, userdata, msg):
 
 def message_handler(client, msg):
     if msg.topic == 'boiler2_actuator':
-        print("msg.payload ", msg.payload)
         boiler2.power = float(msg.payload)
         boiler2.model()
 
 
 if __name__ == '__main__':
     print('Instantiating boiler 2 entity!')
-    r = random.randrange(1, 100)
+    r = random.randrange(1, 10000)
     cname = "Boiler1-" + str(r)     # broker doesn't like when two clients with same name connect
     boiler2 = Boiler(cname, TIME_SLOT, BOILER2_RATED_P, BOILER2_TEMP_MIN, BOILER2_TEMP_MAX, BOILER2_INITIAL_TEMP)
     # print('boiler1.current_temp', boiler1.current_temp)

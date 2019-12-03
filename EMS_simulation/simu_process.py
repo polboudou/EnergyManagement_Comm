@@ -23,8 +23,11 @@ BOILER2_RATED_P = 7600  # in Watts
 BOILER1_VOLUME = 800  # in litres
 BOILER2_VOLUME = 800  # in litres
 
-BOILER1_INITIAL_TEMP = 45  # in degree celsius
-BOILER2_INITIAL_TEMP = 45  # in degree celsius
+#BOILER1_INITIAL_TEMP = 45  # in degree celsius
+#BOILER2_INITIAL_TEMP = 45  # in degree celsius
+
+BOILER1_INITIAL_TEMP = 40  # in degree celsius
+BOILER2_INITIAL_TEMP = 30  # in degree celsius
 
 BATTERY_SOC_MAX = 5000 * 60                 # in Watts min
 BATTERY_SOC_MIN = 100 * 60                  # in Watts min
