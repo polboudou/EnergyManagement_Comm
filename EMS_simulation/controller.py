@@ -2,10 +2,12 @@
 
 import pandas as pd
 import numpy as np
+from scipy import interpolate
 import random
 import matplotlib.pyplot as plt
 import paho.mqtt.client as mqtt # import the client
 import time
+from datetime import timedelta
 from EMS_simulation.control_algorithms import scenarios
 broker_address = "mqtt.teserakt.io"  # use external broker (alternative broker address: test.mosquitto.org)
 
@@ -13,9 +15,11 @@ FORECAST_INACCURACY_COEF = 0.1  # 0 for perfect accuracy, 1 for big inaccuracy
 TIME_SLOT = 10  # in minutes
 # HORIZON = 20 # in minutes, corresponds to 24 hours
 HORIZON = 1440  # in minutes, corresponds to 24 hours
+MPC_START_TIME = '05.01.2018 00:00:00'  # pandas format mm.dd.yyyy hh:mm:ss
+
+CONTROL_TIMESTEP = 1    # in minutes
 
 scenario = 'Scenario2'
-
 
 BOILER1_TEMP_MIN = 40  # in degree celsius
 BOILER1_TEMP_MAX = 50  # in degree celsius
@@ -43,10 +47,10 @@ class Controller():
         self.client = self.setup_client()
         self.Tb1 = 0
         self.pb1 = 0
-        self.sb1 = 0
+        self.sb1 = 1
         self.Tb2 = 0
         self.pb2 = 0
-        self.sb2 = 0
+        self.sb2 = 1
         self.Tb1_list = []
         self.pb1_list = []
         self.sb1_list = []
@@ -54,21 +58,10 @@ class Controller():
         self.pb2_list = []
         self.sb2_list = []
 
+
     def run_algorithm(self, p_x):
 
         if 'Scenario1' in self.description:
-            '''self.Tb1_list.append(self.Tb1)
-            self.pb1_list.append(self.pb1)
-            self.sb1_list.append(self.sb1)
-            self.Tb2_list.append(self.Tb2)
-            self.pb2_list.append(self.pb2)
-            self.sb2_list.append(self.sb2)
-            output = scenarios.algo_scenario2({1: [self.Tb1, self.pb1, self.sb1], 2: [self.Tb2, self.pb2, self.sb2]}, p_x)
-            self.sb1 = output['hyst_states'][1]
-            self.sb2 = output['hyst_states'][2]
-            self.client.run_control_flag = 0
-            print('scenario2 output : ', output)
-            return output['actions']'''
             self.Tb1_list.append(self.Tb1)
             self.pb1_list.append(self.pb1)
             self.Tb2_list.append(self.Tb2)
@@ -80,15 +73,30 @@ class Controller():
         if 'Scenario2' in self.description:
             self.Tb1_list.append(self.Tb1)
             self.pb1_list.append(self.pb1)
-            self.sb1_list.append(self.sb1)
             self.Tb2_list.append(self.Tb2)
             self.pb2_list.append(self.pb2)
-            self.sb2_list.append(self.sb2)
             output = scenarios.algo_scenario2({1: [self.Tb1, self.pb1, self.sb1], 2: [self.Tb2, self.pb2, self.sb2]}, p_x)
             self.sb1 = output['hyst_states'][1]
+            self.sb1_list.append(self.sb1)
             self.sb2 = output['hyst_states'][2]
+            self.sb2_list.append(self.sb2)
+
             self.client.run_control_flag = 0
-            print('scenario2 output : ', output)
+            return output['actions']
+
+        if 'Scenario0' in self.description:
+            print("0000000000000000000000000")
+            self.Tb1_list.append(self.Tb1)
+            self.pb1_list.append(self.pb1)
+            self.sb1_list.append(self.sb1)
+            self.Tb2_list.append(self.Tb2)
+            output = scenarios.algo_scenario0({1: [self.Tb1, self.pb1, self.sb1], 2: [self.Tb2, self.pb2, self.sb2]})
+            self.sb1 = output['hyst_states'][1]
+            self.sb1_list.append(self.sb1)
+            self.sb2 = output['hyst_states'][2]
+            self.sb2_list.append(self.sb2)
+
+            self.client.run_control_flag = 0
             return output['actions']
 
     def setup_client(self):
@@ -101,14 +109,32 @@ class Controller():
         client.loop_start()  # without the loop, the call back functions dont get processed
         return client
 
+def new_resolution(y, step):
+    time_steps = np.arange(0, len(y))
+
+    f = interpolate.interp1d(time_steps, y, fill_value="extrapolate")
+
+    new_timesteps = HORIZON / step
+    print(new_timesteps)
+    print(1./new_timesteps)
+    new_time = np.arange(0, len(y), len(y) / new_timesteps)
+    new_y = f(new_time)
+    return new_y
 
 def get_excess_power_forecast():
     # Data acquisition. Simulation of daily power excess (P_PV - P_nc)
-    excess = pd.read_excel('data_input/Energie - 00003 - Pache.xlsx', index_col=[0], usecols=[0, 1])
-    excess['P_PV - P_nc (kW)'] = excess[
-                                     'Flux energie au point d\'injection (kWh)'] * 6 * 1000  # Convert the energy (kWh) to power (W) and power convention (buy positive and sell negative)
-    del excess['Flux energie au point d\'injection (kWh)']  # we do not need the energy column anymore
-    return excess['P_PV - P_nc (kW)']
+    excess_df = pd.read_excel('data_input/Energie - 00003 - Pache.xlsx', index_col=[0], usecols=[0, 1])
+    excess_df['P_PV - P_nc (kW)'] = excess_df[
+                                     'Flux energie au point d\'injection (kWh)'] * 6 * -1000  # Convert the energy (kWh) to power (W) and power convention (buy positive and sell negative)
+    del excess_df['Flux energie au point d\'injection (kWh)']  # we do not need the energy column anymore
+    start_index = excess_df.index[excess_df.index == MPC_START_TIME][0]  # df.index returns a list
+    end_index = start_index + timedelta(minutes=HORIZON - TIME_SLOT)
+    excess_df = excess_df.loc[start_index:end_index]
+    print(len(excess_df))
+    excess = excess_df['P_PV - P_nc (kW)'].to_numpy()
+    excess = new_resolution(excess, CONTROL_TIMESTEP)
+
+    return excess
 
 
 def get_excess_power_simulation(p_x_forecast):
@@ -118,6 +144,17 @@ def get_excess_power_simulation(p_x_forecast):
     p_x = p_x_forecast + FORECAST_INACCURACY_COEF*mean_px*np.random.normal(size=len(p_x_forecast))
     return(p_x)
 
+def get_energy_sell_price():
+    df = pd.read_excel('data_input/energy_sell_price_10min_granularity.xlsx', index_col=[0], usecols=[0, 1])
+    #df.plot.line(y='Sell Price (CHF / kWh)')
+    #plt.savefig('data_output/figs_mpc_battery/energy_sell_price_24hrs.pdf')
+    return df['Sell Price (CHF / kWh)']
+
+def get_energy_buy_price():
+    df = pd.read_excel('data_input/energy_buy_price_10min_granularity.xlsx', index_col=[0], usecols=[0, 1])
+    #df.plot.line(y='Buy Price (CHF / kWh)')
+    #plt.savefig('data_output/figs_mpc_battery/energy_buy_price_24hrs.pdf')
+    return df['Buy Price (CHF / kWh)']
 
 def Initialise_client_object():
     mqtt.Client.last_pub_time = time.time()
@@ -149,10 +186,10 @@ def message_handler(client, msg):
 
     if msg.topic == 'boiler2_sensor/power':
         controller.pb2 = float(msg.payload)
+        controller.client.run_control_flag += 1
 
     if msg.topic == 'boiler2_sensor/temp':
         controller.Tb2 = float(msg.payload)
-        controller.client.run_control_flag += 1
 
 
 if __name__ == '__main__':
@@ -160,20 +197,23 @@ if __name__ == '__main__':
     print('Instantiating controller!')
     Initialise_client_object()      # add extra flags
 
-    r = random.randrange(1, 1000)
+    r = random.randrange(1, 10000)
     cname = scenario + "-" + str(r)     # broker doesn't like when two clients with same name connect
     controller = Controller(cname)
+    #time.sleep(1)
+    sell_price = get_energy_sell_price()
+    buy_price = get_energy_buy_price()
+    p_x = get_excess_power_forecast()
 
-    p_x_forecast = get_excess_power_forecast()
-    p_x = get_excess_power_simulation(p_x_forecast)
     controller.client.subscribe("boiler1_sensor/temp")
     controller.client.subscribe("boiler1_sensor/power")
     controller.client.subscribe("boiler2_sensor/temp")
     controller.client.subscribe("boiler2_sensor/power")
+    #time.sleep(1)
 
     for h in range(SIMU_STEPS):
     #for h in range(2):
-        time.sleep(0.1)
+        #time.sleep(0.1)
         controller.client.publish('boilers', 'Request measurement')
         time.sleep(0.1) # to ensure that all units are instantiated
         print('controller.pb1', controller.pb1)
@@ -182,10 +222,36 @@ if __name__ == '__main__':
         print('controller.Tb2', controller.Tb2)
         while not controller.client.run_control_flag == no_entities:
             pass
-        actions = controller.run_algorithm(p_x_forecast[h])
+        actions = controller.run_algorithm(p_x[h])
         controller.client.publish('boiler1_actuator', str(actions[1]))
         controller.client.publish('boiler2_actuator', str(actions[2]))
         #print("controller.client.run_control_flag", controller.client.run_control_flag)
+
+    # computing cost
+
+    print("pb1_list = ", controller.pb1_list)
+    print("pb2_list = ", controller.pb2_list)
+    print("Tb1_list = ", controller.Tb1_list)
+    print("Tb2_list = ", controller.Tb2_list)
+    print("sb1_list = ", controller.sb1_list)
+    print("sb2_list = ", controller.sb2_list)
+
+
+    p_grid = []
+    cost = 0
+    for h in range(SIMU_STEPS):
+        p_grid.append(p_x[h] + controller.pb1_list[h] + controller.pb2_list[h])
+        p_grid_kWh = p_grid[h] * (TIME_SLOT/60) * 0.001 # convert Watt to kWh
+        if p_grid_kWh > 0:
+            cost += p_grid_kWh * sell_price[h]
+        if p_grid_kWh <= 0:
+            cost += p_grid_kWh * buy_price[h]
+
+    print("p_grid = ", p_grid)
+    print("Electricity cost of the simulated ", SIMU_STEPS * TIME_SLOT / 60, " hours is ", cost)
+
+
+
 
     controller.client.publish('boilers', 'End')
     controller.client.loop_stop()

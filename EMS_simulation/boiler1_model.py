@@ -60,7 +60,7 @@ def get_hot_water_usage_simu():
     df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
 	#df.plot.line(y='Hot water usage (litres)')
 	#plt.savefig('../../figs_output/hot_water_usage_profile_24hrs.pdf')
-    hot_water_usage_list = df.values/2 #for test purposes, otherwise too big.
+    hot_water_usage_list = df.values/3 #for test purposes, otherwise too big.
     return hot_water_usage_list
 
 
@@ -99,7 +99,7 @@ def message_handler(client, msg):
 if __name__ == '__main__':
 
     print('Instantiating boiler 1 entity!')
-    r = random.randrange(1, 100)
+    r = random.randrange(1, 10000)
     cname = "Boiler1-" + str(r)     # broker doesn't like when two clients with same name connect
     boiler1 = Boiler(cname, TIME_SLOT, BOILER1_RATED_P, BOILER1_TEMP_MIN, BOILER1_TEMP_MAX, BOILER1_INITIAL_TEMP)
 
@@ -108,8 +108,9 @@ if __name__ == '__main__':
     boiler1.client.subscribe("boilers")
     boiler1.client.subscribe('boiler1_actuator')
 
-    #while True:
-    #    pass
+    '''while True:
+        boiler1.model()'''
+
     time.sleep(820)
     print('FIN DE BOILER1 CONNECTION\n \n \n \n')
     boiler1.client.loop_stop()
