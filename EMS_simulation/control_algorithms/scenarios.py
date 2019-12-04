@@ -13,7 +13,7 @@ TEMP = 0                 # boiler state variable n0
 POWER = 1                # boiler state variable n1
 HYST = 2                 # boiler state variable n2
 
-DT = 10  # in minutes
+DT = 1  # in minutes
 HORIZON = 1440  # in minutes, corresponds to 24 hours
 
 BOILER1_TEMP_MIN = 40   # in degree celsius
@@ -22,7 +22,7 @@ BOILER1_TEMP_DELTA = 42 # in degree celsius
 
 BOILER2_TEMP_MIN = 30   # in degree celsius
 BOILER2_TEMP_MAX = 60   # in degree celsius
-BOILER2_TEMP_DELTA = 35 # in degree celsius
+BOILER2_TEMP_DELTA = 32 # in degree celsius
 
 
 BOILERS_TEMP_MAX={1: BOILER1_TEMP_MAX, 2: BOILER2_TEMP_MAX}
