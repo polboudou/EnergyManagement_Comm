@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 
 
 import pandas as pd
@@ -20,7 +21,7 @@ MPC_START_TIME = '05.01.2018 00:00:00'  # pandas format mm.dd.yyyy hh:mm:ss
 SIMU_TIMESTEP = 1
 CONTROL_TIMESTEP = 10    # in minutes
 
-scenario = 'Scenario1'
+scenario = 'Scenario3'
 
 BOILER1_TEMP_MIN = 40  # in degree celsius
 BOILER1_TEMP_MAX = 50  # in degree celsius
@@ -54,12 +55,16 @@ class Controller():
         self.Tb2 = 0
         self.pb2 = 0
         self.sb2 = 0
+        self.soc_bat = 0
+        self.p_bat = 0
         self.Tb1_list = []
         self.pb1_list = []
         self.sb1_list = []
         self.Tb2_list = []
         self.pb2_list = []
         self.sb2_list = []
+        self.soc_bat_list = []
+        self.p_bat_list = []
 
 
     def run_algorithm(self, p_x):
@@ -86,6 +91,14 @@ class Controller():
 
         if 'Scenario0' in self.description:
             output = scenarios.algo_scenario0({1: [self.Tb1, self.pb1, self.sb1], 2: [self.Tb2, self.pb2, self.sb2]})
+            self.sb1 = output['hyst_states'][1]
+            self.sb1_list.append(self.sb1)
+            self.sb2 = output['hyst_states'][2]
+            self.sb2_list.append(self.sb2)
+            return output['actions']
+
+        if 'Scenario3' in self.description:
+            output = scenarios.algo_scenario3({1: [self.Tb1, self.pb1, self.sb1], 2: [self.Tb2, self.pb2, self.sb2]}, p_x, [self.soc_bat, self.p_bat] )
             self.sb1 = output['hyst_states'][1]
             self.sb1_list.append(self.sb1)
             self.sb2 = output['hyst_states'][2]
@@ -184,6 +197,14 @@ def message_handler(client, msg):
         controller.Tb2 = float(msg.payload)
         controller.Tb2_list.append(controller.Tb2)
 
+    if msg.topic == 'battery/soc':
+        controller.soc_bat = float(msg.payload)
+        controller.soc_bat_list.append(controller.soc_bat)
+
+    if msg.topic == 'battery/power':
+        controller.p_bat = float(msg.payload)
+        controller.p_bat_list.append(controller.p_bat)
+
 
 if __name__ == '__main__':
 
@@ -201,8 +222,11 @@ if __name__ == '__main__':
     controller.client.subscribe("boiler1_sensor/power")
     controller.client.subscribe("boiler2_sensor/temp")
     controller.client.subscribe("boiler2_sensor/power")
+    controller.client.subscribe("battery/soc")
+    controller.client.subscribe("battery/power")
     controller.client.publish('boiler1_actuator', 0)
     controller.client.publish('boiler2_actuator', 0)
+    controller.client.publish('batteryMS', 0)
 
     for h in range(CONTROL_STEPS):
     #for h in range(2):
@@ -212,8 +236,9 @@ if __name__ == '__main__':
         actions = controller.run_algorithm(p_x[h])
         controller.client.publish('boiler1_actuator', str(actions[1]))
         controller.client.publish('boiler2_actuator', str(actions[2]))
+        controller.client.publish('batteryMS', str(actions['bat']))
 
-        #print('controller.pb1', controller.pb1)
+    #print('controller.pb1', controller.pb1)
         #print('controller.Tb1', controller.Tb1)
         #print('controller.pb2', controller.pb2)
         #print('controller.Tb2', controller.Tb2)
@@ -249,6 +274,8 @@ if __name__ == '__main__':
     print("Tb2_list = ", controller.Tb2_list)
     print("sb1_list = ", controller.sb1_list)
     print("sb2_list = ", controller.sb2_list)
+    print("soc_bat_list = ", controller.soc_bat_list)
+    print("p_bat_list = ", controller.p_bat_list)
 
     print("len(pb1_list = ", len(controller.pb1_list))
     print("len(pb2_list = ", len(controller.pb2_list))
