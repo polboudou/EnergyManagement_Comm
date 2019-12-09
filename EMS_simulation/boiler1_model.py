@@ -10,9 +10,8 @@ import time
 
 TIME_SLOT = 1  # in minutes
 CONTROL_SLOT = 10   # in minutes
-# HORIZON = 20 # in minutes, corresponds to 24 hours
 HORIZON = 1440  # in minutes, corresponds to 24 hours
-HORIZON = 60  # in minutes, corresponds to 24 hours
+HORIZON = 60
 
 BOILER1_TEMP_MIN = 40  # in degree celsius
 BOILER1_TEMP_MAX = 50  # in degree celsius
@@ -21,7 +20,7 @@ BOILER1_TEMP_INCOMING_WATER = 20  # in degree celsius
 
 BOILER1_RATED_P = -7600  # in Watts
 BOILER1_VOLUME = 800  # in litres
-BOILER1_INITIAL_TEMP = 42  # in degree celsius
+BOILER1_INITIAL_TEMP = 45  # in degree celsius
 C =  60 / (4.186 * 997 * BOILER1_VOLUME)    # in [C/(Watt*min)]
 
 broker_address = "mqtt.teserakt.io"  # use external broker
@@ -137,3 +136,22 @@ if __name__ == '__main__':
     print('FIN DE BOILER1 CONNECTION\n \n \n \n')
     boiler1.client.loop_stop()
     boiler1.client.disconnect(broker_address)
+
+    '''    BOILER1_INITIAL_TEMP = 45  # in degree celsius
+    BOILER2_INITIAL_TEMP = 45  # in degree celsius
+    C = (1 * 60) / (4.186 * 997 * 800)
+
+    for i in range(3):
+
+        if i == 0:
+            outputs = mpc_boilers.mpciteration(BOILER1_INITIAL_TEMP, BOILER2_INITIAL_TEMP, i)
+            print("outputs ", outputs)
+            T_b1 = BOILER1_INITIAL_TEMP + C * outputs[1]
+            T_b2 = BOILER2_INITIAL_TEMP + C * outputs[2]
+
+        else:
+            outputs = mpc_boilers.mpciteration(T_b1, T_b2, i)
+            T_b1 += C * outputs[1]
+            T_b2 += C * outputs[2]
+        print('outputs ', outputs)
+        print("temps ", T_b1, T_b2)'''

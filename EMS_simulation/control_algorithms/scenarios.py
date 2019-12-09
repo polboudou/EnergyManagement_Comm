@@ -15,6 +15,7 @@ HYST = 2                 # boiler state variable n2
 
 DT = 1  # in minutes
 HORIZON = 1440  # in minutes, corresponds to 24 hours
+HORIZON = 60
 
 BOILER1_TEMP_MIN = 40   # in degree celsius
 BOILER1_TEMP_MAX = 50   # in degree celsius

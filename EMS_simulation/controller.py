@@ -14,14 +14,13 @@ from EMS_simulation.control_algorithms import mpc_boilers
 broker_address = "mqtt.teserakt.io"  # use external broker (alternative broker address: test.mosquitto.org)
 
 FORECAST_INACCURACY_COEF = 0.1  # 0 for perfect accuracy, 1 for big inaccuracy
-# HORIZON = 20 # in minutes, corresponds to 24 hours
-HORIZON = 1440  # in minutes, corresponds to 24 hours
+#HORIZON = 1440  # in minutes, corresponds to 24 hours
 HORIZON = 60  # in minutes, corresponds to 24 hours
 MPC_START_TIME = '05.01.2018 00:00:00'  # pandas format mm.dd.yyyy hh:mm:ss
 SIMU_TIMESTEP = 1
 CONTROL_TIMESTEP = 10    # in minutes
 
-scenario = 'MPC'
+scenario = 'Scenario1'
 
 BOILER1_TEMP_MIN = 40  # in degree celsius
 BOILER1_TEMP_MAX = 50  # in degree celsius
@@ -70,6 +69,7 @@ class Controller():
             output = mpc_boilers.mpciteration(self.Tb1, self.Tb2, self.control_iter)
             print("---------MPC computing time =", time.time()-start)
             print("outputs mpc:", output)
+            self.control_iter += 1
             return output
 
         if 'Scenario1' in self.description:
@@ -91,8 +91,6 @@ class Controller():
             self.sb2 = output['hyst_states'][2]
             self.sb2_list.append(self.sb2)
             return output['actions']
-
-        self.control_iter += 1
 
     def setup_client(self):
         client = mqtt.Client(self.description)
