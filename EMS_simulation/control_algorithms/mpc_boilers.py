@@ -54,7 +54,6 @@ def get_excess_power_forecast(iteration):
 	del df['Flux energie au point d\'injection (kWh)'] # we do not need the energy column anymore
 
 	start_index = df.index[df.index == (MPC_START_TIME)][0] # df.index returns a list
-	print('start_index ', start_index)
 	start_index += timedelta(minutes=iteration*TIME_SLOT)
 	end_index = start_index + timedelta(minutes = HORIZON - TIME_SLOT)
 	excess_power_forecast_df = df.loc[start_index:end_index]
@@ -87,6 +86,7 @@ def get_energy_buy_price():
 def mpciteration(T_B1_init, T_B2_init, iteration):
 	# Get disturbance forecasts
 	# 1. Get excess solar power forecasts
+
 	excess_power_forecast_df = get_excess_power_forecast(iteration)
 
 	# 2. Get hot water consumption volume forecast
@@ -106,7 +106,11 @@ def mpciteration(T_B1_init, T_B2_init, iteration):
 
 
 	############ Set up the optimisation problem
+	print(iteration)
+
 	current_time = datetime.strptime(MPC_START_TIME, "%m.%d.%Y %H:%M:%S") + timedelta(minutes=iteration*TIME_SLOT)
+	print(current_time)
+
 	indices = []
 	indices.append(current_time)
 	print(current_time)
@@ -205,8 +209,6 @@ def mpciteration(T_B1_init, T_B2_init, iteration):
 		buy_index = energy_buy_price_df.index[energy_buy_price_df.index == current_time][0] # df.index returns a list
 		current_sell_price = energy_sell_price_df.loc[sell_index] # per unit energy price
 		current_buy_price = energy_buy_price_df.loc[buy_index] # per unit (kWh) energy price
-		#print (current_buy_price[0])
-		#print (current_sell_price[0])
 		row = [0] * no_ctrl_vars
 		row[x * NO_CTRL_VARS_PS] = -1
 		row[x * NO_CTRL_VARS_PS + 1] = current_buy_price[0] / (6 * 1000) # converting it to price per watt-10minutes
@@ -280,19 +282,20 @@ def mpciteration(T_B1_init, T_B2_init, iteration):
 	outputs = {1: res.x[2]*1000, 2: res.x[3]*1000}
 	return outputs
 
+'''
+
+if __name__ == '__main__':
 
 
-'''if __name__ == '__main__':
-
-
-	BOILER1_INITIAL_TEMP = 45  # in degree celsius
-	BOILER2_INITIAL_TEMP = 45  # in degree celsius
+	BOILER1_INITIAL_TEMP = 42  # in degree celsius
+	BOILER2_INITIAL_TEMP = 32  # in degree celsius
 	C = (1 * 60) / (4.186 * 997 * 800)
 
 	for i in range(3):
 
 		if i == 0:
 			outputs = mpciteration(BOILER1_INITIAL_TEMP, BOILER2_INITIAL_TEMP, i)
+			print("outputs ", outputs)
 			T_b1 = BOILER1_INITIAL_TEMP + C * outputs[1]
 			T_b2 = BOILER2_INITIAL_TEMP + C * outputs[2]
 

@@ -11,7 +11,7 @@ import time
 TIME_SLOT = 1                   # in minutes
 CONTROL_SLOT = 10                # in minutes
 HORIZON = 1440                  # in minutes, corresponds to 24 hours
-HORIZON = 60  # in minutes, corresponds to 24 hours
+HORIZON = 60
 
 BOILER2_TEMP_MIN = 30           # in degree celsius
 BOILER2_TEMP_MAX = 60           # in degree celsius
@@ -20,7 +20,7 @@ BOILER2_TEMP_INCOMING_WATER = 20  # in degree celsius
 
 BOILER2_RATED_P = -7600         # in Watts
 BOILER2_VOLUME = 800            # in litres
-BOILER2_INITIAL_TEMP = 32       # in degree celsius
+BOILER2_INITIAL_TEMP = 45       # in degree celsius
 C_BOILER = 60 / (4.186 * 997 * BOILER2_VOLUME)     # in [C/(Watt*min)]
 
 broker_address = "mqtt.teserakt.io"  # use external broker
