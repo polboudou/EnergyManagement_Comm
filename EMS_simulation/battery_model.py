@@ -1,12 +1,10 @@
 #!/usr/bin/env python3
 
-import pandas as pd
 import random
 import numpy as np
 from scipy import interpolate
 import paho.mqtt.client as mqtt # import the client
 import time
-
 
 TIME_SLOT = 1  # in minutes
 CONTROL_SLOT = 10   # in minutes
@@ -19,6 +17,7 @@ PMAX_CH = -5            # Max battery charging power (kW)
 PMAX_DISCH = 5          # Max battery discharging power (kW)
 
 broker_address = "mqtt.teserakt.io"  # use external broker
+
 
 class Battery():
     def __init__(self, description, time_slot, max_charge_power, max_discharge_power, min_soc, max_soc, current_soc):
@@ -35,7 +34,7 @@ class Battery():
         self.control_received = False
 
     def model(self):
-        self.current_soc = self.current_temp - self.dt * self.power
+        self.current_soc = self.current_soc - self.dt * self.current_power
         self.time_step += 1
 
 
@@ -83,7 +82,6 @@ def on_message_boiler(client, userdata, msg):
 
 def message_handler(client, msg):
     if msg.topic == 'batteryMS':
-        #print("msg.payload ", msg.payload)
         battery.current_power = float(msg.payload)
         battery.control_received = True
 
@@ -98,12 +96,12 @@ if __name__ == '__main__':
 
     for t in range(int(HORIZON/TIME_SLOT)):
         if not (battery.time_step % CONTROL_SLOT):
-            print("Boiler 1 period ", t, "min")
+            print("Battery period ", t, "min")
             while not battery.control_received:
                 pass
-        battery.client.publish('batteryMS/soc', battery.current_temp)
+        battery.client.publish('battery/soc', battery.current_soc)
         time.sleep(0.0001)
-        battery.client.publish('batteryMS/power', battery.current_power)
+        battery.client.publish('battery/power', battery.current_power)
         time.sleep(0.0001)
         battery.model()
         battery.control_received = False
