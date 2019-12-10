@@ -6,18 +6,17 @@ from scipy import interpolate
 import paho.mqtt.client as mqtt # import the client
 import time
 
-TIME_SLOT = 1  # in minutes
-CONTROL_SLOT = 10   # in minutes
+SIMU_TIMESTEP = 1  # in minutes
+CONTROL_TIMESTEP = 10   # in minutes
 HORIZON = 1440  # in minutes, corresponds to 24 hours
-HORIZON = 60
+#HORIZON = 60
 
-SOC_MAX = 5             # Max State-of-Charge battery (kWh)
-SOC_MIN = 0.2           # Min State-of-Charge battery (kWh)
-PMAX_CH = -5            # Max battery charging power (kW)
-PMAX_DISCH = 5          # Max battery discharging power (kW)
+SOC_MAX = 5000             # Max State-of-Charge battery (Wh)
+SOC_MIN = 200           # Min State-of-Charge battery (Wh)
+PMAX_CH = -5000            # Max battery charging power (W)
+PMAX_DISCH = 5000          # Max battery discharging power (W)
 
-broker_address = "mqtt.teserakt.io"  # use external broker
-
+broker_address ="mqtt.teserakt.io"   # use external broker (alternative broker address: "test.mosquitto.org")
 
 class Battery():
     def __init__(self, description, time_slot, max_charge_power, max_discharge_power, min_soc, max_soc, current_soc):
@@ -34,7 +33,8 @@ class Battery():
         self.control_received = False
 
     def model(self):
-        self.current_soc = self.current_soc - self.dt * self.current_power
+        self.current_soc = self.current_soc - (self.dt/60) * self.current_power
+
         self.time_step += 1
 
 
@@ -47,17 +47,6 @@ class Battery():
         client.connect(broker_address)
         client.loop_start()  # without the loop, the call back functions dont get processed
         return client
-
-def new_resolution(y, step):
-    time_steps = np.arange(0, len(y))
-
-    f = interpolate.interp1d(time_steps, y, fill_value="extrapolate")
-
-    new_timesteps = HORIZON / step
-    new_time = np.arange(0, len(y), len(y) / new_timesteps)
-    new_y = f(new_time)
-    return new_y
-
 
 # callback functions for communication
 
@@ -89,13 +78,13 @@ def message_handler(client, msg):
 if __name__ == '__main__':
 
     print('Instantiating battery entity!')
-    r = random.randrange(1, 10000)
-    cname = "Battery-" + str(r)     # broker doesn't like when two clients with same name connect
-    battery = Battery(cname, TIME_SLOT, PMAX_CH, PMAX_DISCH, SOC_MIN, SOC_MAX, current_soc=SOC_MIN)
+    r = random.randrange(1, 100000)
+    cname = "Battery_" + str(r)     # broker doesn't like when two clients with same name connect
+    battery = Battery(cname, SIMU_TIMESTEP, PMAX_CH, PMAX_DISCH, SOC_MIN, SOC_MAX, current_soc=SOC_MIN)
     battery.client.subscribe('batteryMS')
 
-    for t in range(int(HORIZON/TIME_SLOT)):
-        if not (battery.time_step % CONTROL_SLOT):
+    for t in range(int(HORIZON/SIMU_TIMESTEP)):
+        if not (battery.time_step % CONTROL_TIMESTEP):
             print("Battery period ", t, "min")
             while not battery.control_received:
                 pass

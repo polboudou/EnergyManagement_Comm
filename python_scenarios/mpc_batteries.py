@@ -298,12 +298,12 @@ def main():
     soc_battery.append(BATTERY_INITIAL_SOC / (60*1000)) #converting (Watts min) to kWh)
 
     for x in range(no_slots):
-        power_pcc.append(res.x[x * NO_CTRL_VARS_PS + 1])
-        power_boiler1.append(res.x[x * NO_CTRL_VARS_PS + 2])
-        power_boiler2.append(res.x[x * NO_CTRL_VARS_PS + 3])
+        power_pcc.append(-res.x[x * NO_CTRL_VARS_PS + 1])
+        power_boiler1.append(-res.x[x * NO_CTRL_VARS_PS + 2])
+        power_boiler2.append(-res.x[x * NO_CTRL_VARS_PS + 3])
         temp_boiler1.append(res.x[x * NO_CTRL_VARS_PS + 4])
         temp_boiler2.append(res.x[x * NO_CTRL_VARS_PS + 5])
-        power_battery.append(res.x[x * NO_CTRL_VARS_PS + 6])
+        power_battery.append(-res.x[x * NO_CTRL_VARS_PS + 6])
         soc_battery.append(res.x[x * NO_CTRL_VARS_PS + 7] / (60*1000)) #converting (Watts min) to kWh
 
     # for the last time slot, we do not have these values
@@ -320,6 +320,9 @@ def main():
     soc_result_df = pd.DataFrame(data=soc_battery, index=indices, columns =['soc_battery (kWh)'])
 
     fig, axes = plt.subplots(2, 1)
+    axes[0].set_xlabel('Time [hours]', size=16)
+    axes[0].set_ylabel('Power [W]', size=16)
+    #axes.tick_params(axis='y', labelsize=16)
     results_df.plot.line(secondary_y=['temp_boiler1 (°C)', 'temp_boiler2 (°C)'], ax=axes[0], figsize=(10,15))
     soc_result_df.plot.line(ax=axes[1])
     energy_buy_price_df.plot.line(ax=axes[1], secondary_y=True)
