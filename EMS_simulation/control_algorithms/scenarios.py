@@ -14,10 +14,10 @@ POWER = 1                # boiler state variable n1
 HYST = 2                 # boiler state variable n2
 SOC = 0                  # battery state variable n0
 
-
-DT = 1  # in minutes
+SIMU_TIMESTEP = 1  # in minutes
+CONTROL_TIMESTEP = 10
 HORIZON = 1440  # in minutes, corresponds to 24 hours
-HORIZON = 60
+#HORIZON = 60
 
 BOILER1_TEMP_MIN = 40   # in degree celsius
 BOILER1_TEMP_MAX = 50   # in degree celsius
@@ -41,22 +41,15 @@ BOILERS_RATED_P = {1: BOILER1_RATED_P, 2: BOILER2_RATED_P}
 BOILER1_VOLUME = 800  # in litres
 BOILER2_VOLUME = 800  # in litres
 
-SOC_MAX = 5             # Max State-of-Charge battery (kWh)
-SOC_MIN = 0.2           # Min State-of-Charge battery (kWh)
-PMAX_CH = -5            # Max battery charging power (kW)
-PMAX_DISCH = 5          # Max battery discharging power (kW)
+# Battery parameters
+SOC_MAX = 5000             # Max State-of-Charge battery (Wh)
+SOC_MIN = 200              # Min State-of-Charge battery (Wh)
+PMAX_CH = -5000            # Max battery charging power (W)
+PMAX_DISCH = 5000          # Max battery discharging power (W)
 
 #(C_water = 4.186 watt-second per gram per degree celsius, water density is 997 grams / litre)
-C_BOILER = (DT * 60) / (4.186 * 997 * BOILER1_VOLUME)   # boiler thermal capacity (C/Watt)
+C_BOILER = (CONTROL_TIMESTEP * 60) / (4.186 * 997 * BOILER1_VOLUME)   # boiler thermal capacity (C/Watt)
 
-
-
-#BOILER1_INITIAL_TEMP = 45  # in degree celsius
-#BOILER2_INITIAL_TEMP = 45  # in degree celsius
-
-
-BOILER1_INITIAL_TEMP = 40  # in degree celsius
-BOILER2_INITIAL_TEMP = 30  # in degree celsius
 
 # Control algorithm
 def algo_scenario2(boiler_states, p_x):
@@ -111,12 +104,17 @@ def algo_scenario3(boiler_states, p_x, battery_state):
             hyst_states[boiler] = 1
         else:
             hyst_states[boiler] = state[HYST]
-
     if p_x > 0:
-        u['bat'] = max((battery_state[SOC] - SOC_MAX)/DT , PMAX_CH , -(p_x - battery_state[POWER]))
+        u['bat'] = max((battery_state[SOC] - SOC_MAX)/(CONTROL_TIMESTEP/60), PMAX_CH , -(p_x - battery_state[POWER]))
+        '''print("px bigger than 0, and u = ", u['bat'])
+        print("also, max(0,(battery_state[SOC] - SOC_MAX)/(CONTROL_TIMESTEP/60) = ", max(0,(battery_state[SOC] - SOC_MAX)/(CONTROL_TIMESTEP/60)))
+        print("-(p_x - battery_state[POWER]) = ", -(p_x - battery_state[POWER]))'''
     else:
-        u['bat'] = min((battery_state[SOC] - SOC_MIN)/DT , PMAX_DISCH , -(p_x - battery_state[POWER]))
-
+        u['bat'] = min((battery_state[SOC] - SOC_MIN)/(CONTROL_TIMESTEP/60) , PMAX_DISCH , -(p_x - battery_state[POWER]))
+        '''print("px smaller than 0, and u = ", u['bat'])
+        print("also, min(0,(battery_state[SOC] - SOC_MIN)/(CONTROL_TIMESTEP/60)) = ",
+              (battery_state[SOC] - SOC_MIN)/(CONTROL_TIMESTEP/60))
+        print("(p_x - battery_state[POWER]) = ", (p_x - battery_state[POWER]))'''
     outputs = {'actions': u, 'hyst_states': hyst_states}
     return outputs
 

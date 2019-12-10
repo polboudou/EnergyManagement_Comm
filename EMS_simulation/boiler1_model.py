@@ -8,10 +8,10 @@ import paho.mqtt.client as mqtt # import the client
 import time
 
 
-TIME_SLOT = 1  # in minutes
-CONTROL_SLOT = 10   # in minutes
+SIMU_TIMESTEP = 1  # in minutes
+CONTROL_TIMESTEP = 10   # in minutes
 HORIZON = 1440  # in minutes, corresponds to 24 hours
-HORIZON = 60
+#HORIZON = 60
 
 BOILER1_TEMP_MIN = 40  # in degree celsius
 BOILER1_TEMP_MAX = 50  # in degree celsius
@@ -23,7 +23,7 @@ BOILER1_VOLUME = 800  # in litres
 BOILER1_INITIAL_TEMP = 45  # in degree celsius
 C =  60 / (4.186 * 997 * BOILER1_VOLUME)    # in [C/(Watt*min)]
 
-broker_address = "mqtt.teserakt.io"  # use external broker
+broker_address ="mqtt.teserakt.io"   # use external broker (alternative broker address: "test.mosquitto.org")
 
 class Boiler():
     def __init__(self, description, TIME_SLOT, max_power, min_temp, max_temp, current_temp):
@@ -58,21 +58,22 @@ class Boiler():
         client.loop_start()  # without the loop, the call back functions dont get processed
         return client
 
-def new_resolution(y, step):
+def new_resolution(y, step, days):
     time_steps = np.arange(0, len(y))
 
     f = interpolate.interp1d(time_steps, y, fill_value="extrapolate")
 
-    new_timesteps = HORIZON / step
+    new_timesteps = days*HORIZON / step
     new_time = np.arange(0, len(y), len(y) / new_timesteps)
     new_y = f(new_time)
     return new_y
 
+
 def get_hot_water_usage_simu():
     df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
     #hot_water_usage_list = df.values/3 #for test purposes, otherwise too big.
-    hot_water_usage = df['Hot water usage (litres)'].to_numpy() /2 * (TIME_SLOT/10) # data is in [litres*10min]
-    hot_water_usage = new_resolution(hot_water_usage, TIME_SLOT)
+    hot_water_usage = df['Hot water usage (litres)'].to_numpy() /2 * (SIMU_TIMESTEP/10) # data is in [litres*10min]
+    hot_water_usage = new_resolution(hot_water_usage, SIMU_TIMESTEP, len(hot_water_usage)*10/(60*24))
 
     return hot_water_usage
 
@@ -112,15 +113,15 @@ def message_handler(client, msg):
 if __name__ == '__main__':
 
     print('Instantiating boiler 1 entity!')
-    r = random.randrange(1, 10000)
-    cname = "Boiler1-" + str(r)     # broker doesn't like when two clients with same name connect
-    boiler1 = Boiler(cname, TIME_SLOT, BOILER1_RATED_P, BOILER1_TEMP_MIN, BOILER1_TEMP_MAX, BOILER1_INITIAL_TEMP)
+    r = random.randrange(1, 100000)
+    cname = "Boiler1_" + str(r)     # broker doesn't like when two clients with same name connect
+    boiler1 = Boiler(cname, SIMU_TIMESTEP, BOILER1_RATED_P, BOILER1_TEMP_MIN, BOILER1_TEMP_MAX, BOILER1_INITIAL_TEMP)
     boiler1.client.subscribe('boiler1_actuator')
 
     print('boiler1.current_temp ', boiler1.current_temp)
 
-    for t in range(int(HORIZON/TIME_SLOT)):
-        if not (boiler1.time_step % CONTROL_SLOT):
+    for t in range(int(HORIZON/SIMU_TIMESTEP)):
+        if not (boiler1.time_step % CONTROL_TIMESTEP):
             print("Boiler 1 period ", t, "min")
             while not boiler1.control_received:
                 pass
