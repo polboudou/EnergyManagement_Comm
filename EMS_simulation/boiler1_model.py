@@ -8,10 +8,12 @@ import paho.mqtt.client as mqtt # import the client
 import time
 
 
-SIMU_TIMESTEP = 1  # in minutes
-CONTROL_TIMESTEP = 10   # in minutes
-HORIZON = 1440  # in minutes, corresponds to 24 hours
-#HORIZON = 60
+SIMU_TIMESTEP = 30  # in minutes
+CONTROL_TIMESTEP = 5*60   # in minutes
+HORIZON = 1440*60  # in minutes, corresponds to 24 hours
+#HORIZON = 720  # for testing purposes
+HORIZON = 60*60  # for testing purposes
+
 
 BOILER1_TEMP_MIN = 40  # in degree celsius
 BOILER1_TEMP_MAX = 50  # in degree celsius
@@ -20,8 +22,8 @@ BOILER1_TEMP_INCOMING_WATER = 20  # in degree celsius
 
 BOILER1_RATED_P = -7600  # in Watts
 BOILER1_VOLUME = 800  # in litres
-BOILER1_INITIAL_TEMP = 45  # in degree celsius
-C =  60 / (4.186 * 997 * BOILER1_VOLUME)    # in [C/(Watt*min)]
+BOILER1_INITIAL_TEMP = 42  # in degree celsius
+C =  1 / (4.186 * 997 * BOILER1_VOLUME)    # in [C/(Watt*sec)]
 
 broker_address ="mqtt.teserakt.io"   # use external broker (alternative broker address: "test.mosquitto.org")
 
@@ -37,6 +39,7 @@ class Boiler():
         self.hot_water_usage = get_hot_water_usage_simu()
         self.client = self.setup_client()
         self.time_step = 0
+        self.time = 0
         self.control_received = False
 
     def model(self):
@@ -44,8 +47,11 @@ class Boiler():
         A = 1 - self.hot_water_usage[self.time_step] / BOILER1_VOLUME
         D = self.hot_water_usage[self.time_step] / BOILER1_VOLUME
         self.current_temp = A * self.current_temp - C * self.dt * self.power + D * BOILER1_TEMP_INCOMING_WATER
+        print('current temp boiler1 ', self.current_temp)
+        #print('current power boiler1 ', self.power)
 
         self.time_step += 1
+        self.time += self.dt
 
 
     def setup_client(self):
@@ -72,7 +78,7 @@ def new_resolution(y, step, days):
 def get_hot_water_usage_simu():
     df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
     #hot_water_usage_list = df.values/3 #for test purposes, otherwise too big.
-    hot_water_usage = df['Hot water usage (litres)'].to_numpy() /2 * (SIMU_TIMESTEP/10) # data is in [litres*10min]
+    hot_water_usage = df['Hot water usage (litres)'].to_numpy() /2 * (SIMU_TIMESTEP/(60*10)) # data is in [litres*10min]
     hot_water_usage = new_resolution(hot_water_usage, SIMU_TIMESTEP, len(hot_water_usage)*10/(60*24))
 
     return hot_water_usage
@@ -118,11 +124,8 @@ if __name__ == '__main__':
     boiler1 = Boiler(cname, SIMU_TIMESTEP, BOILER1_RATED_P, BOILER1_TEMP_MIN, BOILER1_TEMP_MAX, BOILER1_INITIAL_TEMP)
     boiler1.client.subscribe('boiler1_actuator')
 
-    print('boiler1.current_temp ', boiler1.current_temp)
-
     for t in range(int(HORIZON/SIMU_TIMESTEP)):
-        if not (boiler1.time_step % CONTROL_TIMESTEP):
-            print("Boiler 1 period ", t, "min")
+        if not (boiler1.time % CONTROL_TIMESTEP):
             while not boiler1.control_received:
                 pass
         boiler1.client.publish('boiler1_sensor/temp', boiler1.current_temp)
@@ -132,27 +135,6 @@ if __name__ == '__main__':
         boiler1.model()
         boiler1.control_received = False
 
-    print("SALIMOS DEL BOILER1")
-
-    print('FIN DE BOILER1 CONNECTION\n \n \n \n')
     boiler1.client.loop_stop()
     boiler1.client.disconnect(broker_address)
 
-    '''    BOILER1_INITIAL_TEMP = 45  # in degree celsius
-    BOILER2_INITIAL_TEMP = 45  # in degree celsius
-    C = (1 * 60) / (4.186 * 997 * 800)
-
-    for i in range(3):
-
-        if i == 0:
-            outputs = mpc_boilers.mpciteration(BOILER1_INITIAL_TEMP, BOILER2_INITIAL_TEMP, i)
-            print("outputs ", outputs)
-            T_b1 = BOILER1_INITIAL_TEMP + C * outputs[1]
-            T_b2 = BOILER2_INITIAL_TEMP + C * outputs[2]
-
-        else:
-            outputs = mpc_boilers.mpciteration(T_b1, T_b2, i)
-            T_b1 += C * outputs[1]
-            T_b2 += C * outputs[2]
-        print('outputs ', outputs)
-        print("temps ", T_b1, T_b2)'''
