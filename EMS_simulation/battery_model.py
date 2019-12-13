@@ -6,10 +6,12 @@ from scipy import interpolate
 import paho.mqtt.client as mqtt # import the client
 import time
 
-SIMU_TIMESTEP = 1  # in minutes
-CONTROL_TIMESTEP = 10   # in minutes
-HORIZON = 1440  # in minutes, corresponds to 24 hours
-#HORIZON = 60
+SIMU_TIMESTEP = 30  # in minutes
+CONTROL_TIMESTEP = 5*60   # in minutes
+HORIZON = 1440*60  # in minutes, corresponds to 24 hours
+#HORIZON = 720  # for testing purposes
+HORIZON = 60*60  # for testing purposes
+
 
 SOC_MAX = 5000             # Max State-of-Charge battery (Wh)
 SOC_MIN = 200           # Min State-of-Charge battery (Wh)
@@ -34,8 +36,8 @@ class Battery():
 
     def model(self):
         self.current_soc = self.current_soc - (self.dt/60) * self.current_power
-
-        self.time_step += 1
+        print("model current soc =", self.current_soc)
+        self.time_step += self.dt
 
 
     def setup_client(self):
@@ -95,8 +97,5 @@ if __name__ == '__main__':
         battery.model()
         battery.control_received = False
 
-    print("SALIMOS DEL battery")
-
-    print('FIN DE battery CONNECTION\n \n \n \n')
     battery.client.loop_stop()
     battery.client.disconnect(broker_address)

@@ -14,10 +14,12 @@ POWER = 1                # boiler state variable n1
 HYST = 2                 # boiler state variable n2
 SOC = 0                  # battery state variable n0
 
-SIMU_TIMESTEP = 1  # in minutes
-CONTROL_TIMESTEP = 10
-HORIZON = 1440  # in minutes, corresponds to 24 hours
-#HORIZON = 60
+SIMU_TIMESTEP = 30  # in minutes
+CONTROL_TIMESTEP = 5*60
+HORIZON = 1440*60  # in minutes, corresponds to 24 hours
+#HORIZON = 720  # for testing purposes
+HORIZON = 60*60  # for testing purposes
+
 
 BOILER1_TEMP_MIN = 40   # in degree celsius
 BOILER1_TEMP_MAX = 50   # in degree celsius
@@ -25,7 +27,7 @@ BOILER1_TEMP_DELTA = 42 # in degree celsius
 
 BOILER2_TEMP_MIN = 30   # in degree celsius
 BOILER2_TEMP_MAX = 60   # in degree celsius
-BOILER2_TEMP_DELTA = 32 # in degree celsius
+BOILER2_TEMP_DELTA = 36 # in degree celsius
 
 
 BOILERS_TEMP_MAX={1: BOILER1_TEMP_MAX, 2: BOILER2_TEMP_MAX}
@@ -48,14 +50,16 @@ PMAX_CH = -5000            # Max battery charging power (W)
 PMAX_DISCH = 5000          # Max battery discharging power (W)
 
 #(C_water = 4.186 watt-second per gram per degree celsius, water density is 997 grams / litre)
-C_BOILER = (CONTROL_TIMESTEP * 60) / (4.186 * 997 * BOILER1_VOLUME)   # boiler thermal capacity (C/Watt)
+C_BOILER = CONTROL_TIMESTEP / (4.186 * 997 * BOILER1_VOLUME)   # boiler thermal capacity (C/Watt)
 
 
 # Control algorithm
 def algo_scenario2(boiler_states, p_x):
 
-    u_B = {1: 0, 2: 0}
-    hyst_states = {1: 0, 2:0}
+    u_B = {1: boiler_states[1][POWER], 2: boiler_states[2][POWER]}
+    if p_x <= 0:
+        u_B = {1: 0, 2: 0}
+    hyst_states = {1: 0, 2: 0}
     p_x = p_x + boiler_states[1][POWER] + boiler_states[2][POWER]
     boiler_states_sorted = sorted(boiler_states.items(), key=operator.itemgetter(1))
     for (boiler, state) in boiler_states_sorted:
@@ -83,8 +87,11 @@ def algo_scenario2(boiler_states, p_x):
 # Control algorithm
 def algo_scenario3(boiler_states, p_x, battery_state):
 
-    u = {1: 0, 2: 0, 'bat': 0}
-    hyst_states = {1: 0, 2:0}
+    u = {1: boiler_states[1][POWER], 2: boiler_states[2][POWER], 'bat': 0}
+    if p_x <= 0:
+        u = {1: 0, 2: 0, 'bat': 0}
+
+    hyst_states = {1: 0, 2: 0}
     p_x = p_x + boiler_states[1][POWER] + boiler_states[2][POWER] + battery_state[POWER]
     boiler_states_sorted = sorted(boiler_states.items(), key=operator.itemgetter(1))
     for (boiler, state) in boiler_states_sorted:
@@ -125,9 +132,10 @@ def algo_scenario0(boiler_states):
     :param boiler_states:
     :return: supplies boilers when they reach their lower temperature bounds and until they reach upper bounds(thermostat type)
     '''
-    u_B = {1: 0, 2: 0}
-    hyst_states = {1: 0, 2:0}
+    u_B = {1: boiler_states[1][POWER], 2: boiler_states[2][POWER]}
+    hyst_states = {1: 0, 2: 0}
     boiler_states_sorted = sorted(boiler_states.items(), key=operator.itemgetter(1))
+
     for (boiler, state) in boiler_states_sorted:
 
         if state[HYST] == 1:
@@ -140,7 +148,7 @@ def algo_scenario0(boiler_states):
         elif state[TEMP] <= BOILERS_TEMP_MIN[boiler]:
             hyst_states[boiler] = 1
         else:
-            hyst_states[HYST] = state[HYST]
+            hyst_states[boiler] = state[HYST]
 
     outputs = {'actions': u_B, 'hyst_states': hyst_states}
     return outputs
@@ -148,7 +156,9 @@ def algo_scenario0(boiler_states):
 
 def algo_scenario1(boiler_states, p_x):
 
-    u_B = {1: 0, 2: 0}
+    u_B = {1: boiler_states[1][POWER], 2: boiler_states[2][POWER]}
+    if p_x <= 0:
+        u_B = {1: 0, 2: 0}
     p_x = p_x + boiler_states[1][POWER] + boiler_states[2][POWER]
     boiler_states_sorted = sorted(boiler_states.items(), key=operator.itemgetter(1))
     for (boiler, state) in boiler_states_sorted:

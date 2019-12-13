@@ -28,6 +28,8 @@ import random
 TIME_SLOT = 10 # in minutes
 #HORIZON = 20 # in minutes, corresponds to 24 hours
 HORIZON = 1440 # in minutes, corresponds to 24 hours
+#HORIZON = 720  # for testing purposes
+
 MPC_START_TIME = '05.01.2018 00:00:00' # pandas format mm.dd.yyyy hh:mm:ss
 
 
@@ -96,13 +98,6 @@ def mpciteration(T_B1_init, T_B2_init, iteration):
 	energy_sell_price_df = get_energy_sell_price()
 	# Get energy buy price
 	energy_buy_price_df = get_energy_buy_price()
-	
-	concated_df = pd.concat([excess_power_forecast_df, hot_water_usage_forecast_df, energy_sell_price_df, energy_buy_price_df], axis=1)
-	# concated_df.plot.line(y=['power_pcc (kW) (+ import)', 'Hot water usage (litres)'], secondary_y=['Sell Price (CHF / kWh)', 'Buy Price (CHF / kWh)'])
-	#concated_df.plot.line(secondary_y=['Sell Price (CHF / kWh)', 'Buy Price (CHF / kWh)'])
-	#plt.savefig('../../figs_output/disturbances_and_energy_prices.pdf')
-	#plt.show()
-	#exit()
 
 
 	############ Set up the optimisation problem
@@ -132,8 +127,8 @@ def mpciteration(T_B1_init, T_B2_init, iteration):
 		# 2. Setup the bounds for the control variables
 		epsilon_bounds = (None, None)
 		psg_bounds = (None, None)
-		pb1_bounds = (-7600, 0)
-		pb2_bounds = (-7600, 0)
+		pb1_bounds = (BOILER1_RATED_P, 0)
+		pb2_bounds = (BOILER2_RATED_P, 0)
 		tb1_bounds = (BOILER1_TEMP_MIN, BOILER1_TEMP_MAX)
 		tb2_bounds = (BOILER2_TEMP_MIN, BOILER2_TEMP_MAX)
 		bounds_one_slot = [epsilon_bounds, psg_bounds, pb1_bounds, pb2_bounds, tb1_bounds, tb2_bounds]
@@ -233,6 +228,7 @@ def mpciteration(T_B1_init, T_B2_init, iteration):
 		# 	print ("b_eq is")
 		# 	print (b_eq)
 		# 	exit()
+
 	bounds = tuple(bounds)
 
 	# print ("c is")

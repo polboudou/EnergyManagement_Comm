@@ -8,20 +8,22 @@ import paho.mqtt.client as mqtt # import the client
 import time
 
 
-SIMU_TIMESTEP = 1                   # in minutes
-CONTROL_TIMESTEP = 10                # in minutes
-HORIZON = 1440                  # in minutes, corresponds to 24 hours
-#HORIZON = 60
+SIMU_TIMESTEP = 30                   # in minutes
+CONTROL_TIMESTEP = 5*60                # in minutes
+HORIZON = 1440*60                  # in minutes, corresponds to 24 hours
+#HORIZON = 720  # for testing purposes
+HORIZON = 60*60  # for testing purposes
+
 
 BOILER2_TEMP_MIN = 30           # in degree celsius
 BOILER2_TEMP_MAX = 60           # in degree celsius
-BOILER2_TEMP_DELTA = 32         # in degrees celsius
+BOILER2_TEMP_DELTA = 36         # in degrees celsius
 BOILER2_TEMP_INCOMING_WATER = 20  # in degree celsius
 
 BOILER2_RATED_P = -7600         # in Watts
 BOILER2_VOLUME = 800            # in litres
-BOILER2_INITIAL_TEMP = 45       # in degree celsius
-C_BOILER = 60 / (4.186 * 997 * BOILER2_VOLUME)     # in [C/(Watt*min)]
+BOILER2_INITIAL_TEMP = 36       # in degree celsius
+C_BOILER = 1 / (4.186 * 997 * BOILER2_VOLUME)     # in [C/(Watt*sec)]
 
 broker_address ="mqtt.teserakt.io"   # use external broker (alternative broker address: "test.mosquitto.org")
 
@@ -37,6 +39,7 @@ class Boiler():
         self.hot_water_usage = get_hot_water_usage_simu()
         self.client = self.setup_client()
         self.time_step = 0
+        self.time = 0
         self.control_received = False
 
     def model(self):
@@ -44,8 +47,11 @@ class Boiler():
         A = 1 - self.hot_water_usage[self.time_step] / BOILER2_VOLUME
         D = self.hot_water_usage[self.time_step] / BOILER2_VOLUME
         self.current_temp = A * self.current_temp - C_BOILER * self.dt * self.power + D * BOILER2_TEMP_INCOMING_WATER
+        print('current temp boiler2 ', self.current_temp)
+        #print('current power boiler2 ', self.power)
 
         self.time_step += 1
+        self.time += self.dt
 
 
     def setup_client(self):
@@ -70,7 +76,7 @@ def new_resolution(y, step, days):
 
 def get_hot_water_usage_simu():
     df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
-    hot_water_usage = df['Hot water usage (litres)'].to_numpy() /3 * (SIMU_TIMESTEP/10)  # data is in [litres*10min]    # divided by 3 for test purposes
+    hot_water_usage = df['Hot water usage (litres)'].to_numpy() /3 * (SIMU_TIMESTEP/(10*60))  # data is in [litres*10min]    # divided by 3 for test purposes
     hot_water_usage = new_resolution(hot_water_usage, SIMU_TIMESTEP, len(hot_water_usage)*10/(60*24))
     return hot_water_usage
 
@@ -90,10 +96,6 @@ def on_disconnect(client, userdata, flags, rc=0):
 
 def on_message_boiler(client, userdata, msg):
     m_decode = str(msg.payload.decode("utf-8", "ignore"))
-    if m_decode == 'Request measurement':
-        client.publish('boiler2_sensor/temp', boiler2.current_temp)
-        client.publish('boiler2_sensor/power', boiler2.power)
-
     if m_decode == 'End':
         print("this is the end of boiler2")
         client.disconnect(broker_address)
@@ -114,10 +116,8 @@ if __name__ == '__main__':
     boiler2 = Boiler(cname, SIMU_TIMESTEP, BOILER2_RATED_P, BOILER2_TEMP_MIN, BOILER2_TEMP_MAX, BOILER2_INITIAL_TEMP)
     boiler2.client.subscribe('boiler2_actuator')
 
-
     for t in range(int(HORIZON/SIMU_TIMESTEP)):
-        if not (boiler2.time_step % CONTROL_TIMESTEP):
-            print("Boiler 2 period ", t, "min")
+        if not (boiler2.time % CONTROL_TIMESTEP): #only true when model timestep is a multiple of control period (model has to wait for control period)
             while not boiler2.control_received:
                 pass
         boiler2.client.publish('boiler2_sensor/temp', boiler2.current_temp)
@@ -127,8 +127,5 @@ if __name__ == '__main__':
         boiler2.model()
         boiler2.control_received = False
 
-    print("SALIMOS DEL BOILER2 LOOP")
-
-    print('FIN DE BOILER2 CONNECTION\n \n \n \n')
     boiler2.client.loop_stop()
     boiler2.client.disconnect(broker_address)
