@@ -19,7 +19,7 @@ broker_address ="mqtt.teserakt.io"   # use external broker (alternative broker a
 HORIZON = 1440*60  # in seconds, corresponds to 24 hours
 #HORIZON = 720  # for testing purposes
 HORIZON = 60*60  # for testing purposes
-MPC_START_TIME = '05.01.2018 00:00:00'  # pandas format mm.dd.yyyy hh:mm:ss
+MPC_START_TIME = '05.01.2018 12:00:00'  # pandas format mm.dd.yyyy hh:mm:ss
 SIMU_TIMESTEP = 30
 CONTROL_TIMESTEP = 5*60    # in minutes
 
@@ -42,10 +42,9 @@ BOILER2_VOLUME = 800  # in litres
 BOILER1_INITIAL_TEMP = 42  # in degree celsius
 BOILER2_INITIAL_TEMP = 36  # in degree celsius
 
-CONTROL_STEPS = range(0, HORIZON, CONTROL_TIMESTEP)
-CONTROL_STEPS = range(int(HORIZON/CONTROL_TIMESTEP))
+CONTROL_STEPS = range(0, int(HORIZON/SIMU_TIMESTEP), int(CONTROL_TIMESTEP/SIMU_TIMESTEP))
+#CONTROL_STEPS = range(int(HORIZON/CONTROL_TIMESTEP))
 
-SIMU_STEPS = range(0, HORIZON, SIMU_TIMESTEP)
 SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP))
 
 FORECAST_INACCURACY_COEF = 1  # 0 for perfect accuracy, 10 for big inaccuracy
@@ -195,33 +194,27 @@ def message_handler(client, msg):
     if msg.topic == 'boiler1_sensor/power':
         controller.pb1 = float(msg.payload)
         controller.pb1_list.append(controller.pb1)
-        #print("controller.pb1_list", controller.pb1_list)
-
+        print("controller.pb1_list", controller.pb1_list)
 
     if msg.topic == 'boiler1_sensor/temp':
         controller.Tb1 = float(msg.payload)
         controller.Tb1_list.append(controller.Tb1)
-        #print("controller.Tb1_list", controller.Tb1_list)
-
-
+        print("controller.Tb1_list", controller.Tb1_list)
 
     if msg.topic == 'boiler2_sensor/power':
         controller.pb2 = float(msg.payload)
         controller.pb2_list.append(controller.pb2)
-        #print("controller.pb2_list", controller.pb2_list)
-
+        print("controller.pb2_list", controller.pb2_list)
 
     if msg.topic == 'boiler2_sensor/temp':
         controller.Tb2 = float(msg.payload)
         controller.Tb2_list.append(controller.Tb2)
-        #print("controller.Tb2_list", controller.Tb2_list)
-
+        print("controller.Tb2_list", controller.Tb2_list)
 
     if msg.topic == 'battery/soc':
         controller.soc_bat = float(msg.payload)
         controller.soc_bat_list.append(controller.soc_bat)
         #print("controller.soc_bat_list", controller.soc_bat_list)
-
 
     if msg.topic == 'battery/power':
         controller.p_bat = float(msg.payload)
@@ -235,35 +228,47 @@ if __name__ == '__main__':
     r = random.randrange(1, 100000)
     cname = scenario + "_" + str(r)     # broker doesn't like when two clients with same name connect
     controller = Controller(cname)
+    controller.client.subscribe("boiler2_sensor/temp")
+    controller.client.subscribe("boiler2_sensor/power")
+    controller.client.subscribe("boiler1_sensor/temp")
+    controller.client.subscribe("boiler1_sensor/power")
+
+    #controller.client.publish('boiler2_actuator', 0)
+    #controller.client.publish('boiler1_actuator', 0)
+    if scenario == 'Scenario3' or scenario == 'MPCbattery':
+        controller.client.subscribe("battery/soc")
+        controller.client.subscribe("battery/power")
+        #controller.client.publish('batteryMS', 0)
+
     sell_price = get_energy_sell_price()
     buy_price = get_energy_buy_price()
     p_x = get_excess_power_forecast()
     p_x_measured = get_excess_power_simulation(p_x)
 
 
-    controller.client.subscribe("boiler1_sensor/temp")
-    controller.client.subscribe("boiler1_sensor/power")
-    controller.client.subscribe("boiler2_sensor/temp")
-    controller.client.subscribe("boiler2_sensor/power")
-    controller.client.publish('boiler2_actuator', 0)
-    controller.client.publish('boiler1_actuator', 0)
-    if scenario == 'Scenario3' or scenario == 'MPCbattery':
-        controller.client.subscribe("battery/soc")
-        controller.client.subscribe("battery/power")
-        controller.client.publish('batteryMS', 0)
+    # wait until receives first measurements of b1, b2
+    while controller.Tb1 == 0 or controller.Tb2 == 0:
+        time.sleep(0.01)
+
 
     for h in CONTROL_STEPS:
     #for h in range(2):
         #time.sleep(0.1)
         #controller.client.publish(' boilers', 'Request measurement')
-        time.sleep(0.4*(CONTROL_TIMESTEP/SIMU_TIMESTEP))
-        print("controller period", h ,'/', CONTROL_STEPS[-1])
+        print("controller period at", h, 'min')
+        print("boiler1 measurements ", len(controller.Tb1_list))
+        print("boiler2 measurements ", len(controller.Tb2_list))
+        time.sleep(1*(CONTROL_TIMESTEP/SIMU_TIMESTEP))
+
         actions = controller.run_algorithm(p_x[h])
+        print('actions ', actions)
+
         controller.client.publish('boiler1_actuator', str(actions[1]))
         controller.client.publish('boiler2_actuator', str(actions[2]))
         if scenario == 'Scenario3' or scenario == 'MPCbattery':
             controller.client.publish('batteryMS', str(actions['bat']))
 
+        time.sleep(0.1 * (CONTROL_TIMESTEP / SIMU_TIMESTEP))
 
 
     controller.client.publish('boilers', 'End')
@@ -293,16 +298,16 @@ if __name__ == '__main__':
 
     cost = 0
     for h in SIMU_STEPS:
-        p_grid_silutation = (p_x[h] + controller.pb1_list[h] + controller.pb2_list[h]) * (SIMU_TIMESTEP/60) * 0.001 # convert Watt to kWh
+        p_grid_silutation = (p_x[h] + controller.pb1_list[h] + controller.pb2_list[h]) / (3600/SIMU_TIMESTEP) * 0.001 # convert Watt to kWh
         if scenario == 'Scenario3' or scenario == 'MPCbattery':
-            p_grid_silutation += controller.p_bat_list[h] * (SIMU_TIMESTEP/60) * 0.001 # convert Watt to kWh
+            p_grid_silutation += controller.p_bat_list[h] / SIMU_TIMESTEP * 0.001 # convert Watt to kWh
 
         if p_grid_silutation > 0:
             cost += p_grid_silutation * sell_price[h]
         if p_grid_silutation <= 0:
             cost += p_grid_silutation * buy_price[h]
 
-    real_cost = 0
+    '''real_cost = 0
     for h in SIMU_STEPS:
         p_grid = (p_x[CONTROL_TIMESTEP*int(h/CONTROL_TIMESTEP)] + controller.pb1_list[h] + controller.pb2_list[h]) * (SIMU_TIMESTEP / 60) * 0.001
         if scenario == 'Scenario3' or scenario == 'MPCbattery':
@@ -311,7 +316,7 @@ if __name__ == '__main__':
         if p_grid_silutation > 0:
             real_cost += p_grid * sell_price[h]
         if p_grid <= 0:
-            real_cost += p_grid * buy_price[h]
+            real_cost += p_grid * buy_price[h]'''
 
 
     print("Electricity cost of the simulated ", HORIZON / 60, " hours is ", cost)

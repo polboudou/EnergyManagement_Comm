@@ -12,6 +12,8 @@ HORIZON = 1440*60  # in minutes, corresponds to 24 hours
 #HORIZON = 720  # for testing purposes
 HORIZON = 60*60  # for testing purposes
 
+SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP))
+
 
 SOC_MAX = 5000             # Max State-of-Charge battery (Wh)
 SOC_MIN = 200           # Min State-of-Charge battery (Wh)
@@ -31,7 +33,7 @@ class Battery():
         self.current_soc = current_soc
         self.current_power = 0
         self.client = self.setup_client()
-        self.time_step = 0
+        #self.time_step = 0
         self.control_received = False
 
     def model(self):
@@ -79,13 +81,14 @@ def message_handler(client, msg):
 
 if __name__ == '__main__':
 
+    time.sleep(2)
     print('Instantiating battery entity!')
     r = random.randrange(1, 100000)
     cname = "Battery_" + str(r)     # broker doesn't like when two clients with same name connect
     battery = Battery(cname, SIMU_TIMESTEP, PMAX_CH, PMAX_DISCH, SOC_MIN, SOC_MAX, current_soc=SOC_MIN)
     battery.client.subscribe('batteryMS')
 
-    for t in range(int(HORIZON/SIMU_TIMESTEP)):
+    for t in SIMU_TIMESTEP:
         if not (battery.time_step % CONTROL_TIMESTEP):
             print("Battery period ", t, "min")
             while not battery.control_received:
