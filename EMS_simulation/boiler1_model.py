@@ -14,6 +14,7 @@ HORIZON = 1440*60  # in minutes, corresponds to 24 hours
 #HORIZON = 720  # for testing purposes
 HORIZON = 60*60  # for testing purposes
 
+SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP))
 
 BOILER1_TEMP_MIN = 40  # in degree celsius
 BOILER1_TEMP_MAX = 50  # in degree celsius
@@ -23,14 +24,14 @@ BOILER1_TEMP_INCOMING_WATER = 20  # in degree celsius
 BOILER1_RATED_P = -7600  # in Watts
 BOILER1_VOLUME = 800  # in litres
 BOILER1_INITIAL_TEMP = 42  # in degree celsius
-C =  1 / (4.186 * 997 * BOILER1_VOLUME)    # in [C/(Watt*sec)]
+C_BOILER1 =  1 / (4.186 * 997 * BOILER1_VOLUME)    # in [C/(Watt*sec)]
 
 broker_address ="mqtt.teserakt.io"   # use external broker (alternative broker address: "test.mosquitto.org")
 
 class Boiler():
-    def __init__(self, description, TIME_SLOT, max_power, min_temp, max_temp, current_temp):
+    def __init__(self, description, simu_timestep, max_power, min_temp, max_temp, current_temp):
         self.description = description
-        self.dt = TIME_SLOT
+        self.dt = simu_timestep
         self.max_power = max_power
         self.min_temp = min_temp
         self.max_temp = max_temp
@@ -41,13 +42,17 @@ class Boiler():
         self.time_step = 0
         self.time = 0
         self.control_received = False
+        self.model()    # launch model simulation
+        self.time_step -= 1
+        self.time -= self.dt
 
     def model(self):
         # T[h+1] = A * T[h] + C * P[h] + D * T_inlet[h]
+        print("boiler 1, no entiendo, timestep ", self.time_step)
         A = 1 - self.hot_water_usage[self.time_step] / BOILER1_VOLUME
         D = self.hot_water_usage[self.time_step] / BOILER1_VOLUME
-        self.current_temp = A * self.current_temp - C * self.dt * self.power + D * BOILER1_TEMP_INCOMING_WATER
-        print('current temp boiler1 ', self.current_temp)
+        self.current_temp = A * self.current_temp - C_BOILER1 * self.dt * self.power + D * BOILER1_TEMP_INCOMING_WATER
+        #print('current temp boiler1 ', self.current_temp)
         #print('current power boiler1 ', self.power)
 
         self.time_step += 1
@@ -77,15 +82,12 @@ def new_resolution(y, step, days):
 
 def get_hot_water_usage_simu():
     df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
-    #hot_water_usage_list = df.values/3 #for test purposes, otherwise too big.
-    hot_water_usage = df['Hot water usage (litres)'].to_numpy() /2 * (SIMU_TIMESTEP/(60*10)) # data is in [litres*10min]
+    hot_water_usage = df['Hot water usage (litres)'].to_numpy()/2  /(10*60/SIMU_TIMESTEP) # data is in [litres*10min]    # divided by 3 for test purposes
     hot_water_usage = new_resolution(hot_water_usage, SIMU_TIMESTEP, len(hot_water_usage)*10/(60*24))
-
     return hot_water_usage
 
 
 # callback functions for communication
-
 def on_log(client, userdata, level, buf):
      print("log: ",buf)
 
@@ -100,12 +102,8 @@ def on_disconnect(client, userdata, flags, rc=0):
 
 def on_message_boiler(client, userdata, msg):
     m_decode = str(msg.payload.decode("utf-8", "ignore"))
-    if m_decode == 'Request measurement':
-        client.publish('boiler1_sensor/temp', boiler1.current_temp)
-        client.publish('boiler1_sensor/power', boiler1.power)
-
     if m_decode == 'End':
-        print("this is the end of boiler2")
+        print("this is the end of boiler1")
         client.disconnect(broker_address)
     message_handler(client, msg)
 
@@ -114,20 +112,26 @@ def message_handler(client, msg):
         #print("msg.payload ", msg.payload)
         boiler1.power = float(msg.payload)
         boiler1.control_received = True
+        print("BOILER 1111111111111111")
 
 
 if __name__ == '__main__':
 
+    time.sleep(2)
     print('Instantiating boiler 1 entity!')
     r = random.randrange(1, 100000)
     cname = "Boiler1_" + str(r)     # broker doesn't like when two clients with same name connect
     boiler1 = Boiler(cname, SIMU_TIMESTEP, BOILER1_RATED_P, BOILER1_TEMP_MIN, BOILER1_TEMP_MAX, BOILER1_INITIAL_TEMP)
     boiler1.client.subscribe('boiler1_actuator')
+    boiler1.client.publish('boiler1_sensor/power', boiler1.power)
+    boiler1.client.publish('boiler1_sensor/temp', boiler1.current_temp)
 
-    for t in range(int(HORIZON/SIMU_TIMESTEP)):
+    for t in SIMU_STEPS:
         if not (boiler1.time % CONTROL_TIMESTEP):
+            print('waiting for boiler 1 to receive control. boiler1 time:', boiler1.time_step)
             while not boiler1.control_received:
-                pass
+                time.sleep(0.001)
+        print(cname, 't= ', t)
         boiler1.client.publish('boiler1_sensor/temp', boiler1.current_temp)
         time.sleep(0.0001)
         boiler1.client.publish('boiler1_sensor/power', boiler1.power)
@@ -137,4 +141,3 @@ if __name__ == '__main__':
 
     boiler1.client.loop_stop()
     boiler1.client.disconnect(broker_address)
-

@@ -8,8 +8,8 @@ HORIZON = 60*60  # for testing purposes
 #HORIZON = 720  # for testing purposes
 
 MPC_START_TIME = '05.01.2018 00:00:00'  # pandas format mm.dd.yyyy hh:mm:ss
-SIMU_TIMESTEP = 1
-CONTROL_TIMESTEP = 10    # in minutes
+SIMU_TIMESTEP = 30
+CONTROL_TIMESTEP = 5*60    # in minutes
 
 scenario = 'Scenario2'
 
@@ -49,9 +49,9 @@ if __name__ == '__main__':
     print('Starting simulation!')
 
     if scenario == 'Scenario3' or scenario == 'MPCbattery':
-        subprocess.run("python3 boiler1_model.py & python3 boiler2_model.py & python3 battery_model.py & python3 controller.py", shell=True)
+        subprocess.run("python3 controller.py & python3 boiler1_model.py & python3 boiler2_model.py & python3 battery_model.py", shell=True)
     else:
-        subprocess.run("python3 boiler1_model.py & python3 boiler2_model.py & python3 controller.py", shell=True)
+        subprocess.run("python3 controller.py & python3 boiler1_model.py & python3 boiler2_model.py", shell=True)
 
 
 

@@ -14,6 +14,7 @@ HORIZON = 1440*60                  # in minutes, corresponds to 24 hours
 #HORIZON = 720  # for testing purposes
 HORIZON = 60*60  # for testing purposes
 
+SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP))
 
 BOILER2_TEMP_MIN = 30           # in degree celsius
 BOILER2_TEMP_MAX = 60           # in degree celsius
@@ -41,13 +42,16 @@ class Boiler():
         self.time_step = 0
         self.time = 0
         self.control_received = False
+        self.model()    # launch model simulation
+        self.time_step -= 1
+        self.time -= self.dt
 
     def model(self):
         # T[h+1] = A * T[h] + C * P[h] + D * T_inlet[h]
         A = 1 - self.hot_water_usage[self.time_step] / BOILER2_VOLUME
         D = self.hot_water_usage[self.time_step] / BOILER2_VOLUME
         self.current_temp = A * self.current_temp - C_BOILER * self.dt * self.power + D * BOILER2_TEMP_INCOMING_WATER
-        print('current temp boiler2 ', self.current_temp)
+        #print('current temp boiler2 ', self.current_temp)
         #print('current power boiler2 ', self.power)
 
         self.time_step += 1
@@ -74,9 +78,10 @@ def new_resolution(y, step, days):
     new_y = f(new_time)
     return new_y
 
+
 def get_hot_water_usage_simu():
     df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
-    hot_water_usage = df['Hot water usage (litres)'].to_numpy() /3 * (SIMU_TIMESTEP/(10*60))  # data is in [litres*10min]    # divided by 3 for test purposes
+    hot_water_usage = df['Hot water usage (litres)'].to_numpy()/2  /(10*60/SIMU_TIMESTEP) # data is in [litres*10min]    # divided by 3 for test purposes
     hot_water_usage = new_resolution(hot_water_usage, SIMU_TIMESTEP, len(hot_water_usage)*10/(60*24))
     return hot_water_usage
 
@@ -106,20 +111,26 @@ def message_handler(client, msg):
         #print("msg.payload ", msg.payload)
         boiler2.power = float(msg.payload)
         boiler2.control_received = True
+        print("BOILER 2222222222222222222")
 
 
 if __name__ == '__main__':
 
+    time.sleep(2)
     print('Instantiating boiler 2 entity!')
     r = random.randrange(1, 100000)
     cname = "Boiler2_" + str(r)     # broker doesn't like when two clients with same name connect
     boiler2 = Boiler(cname, SIMU_TIMESTEP, BOILER2_RATED_P, BOILER2_TEMP_MIN, BOILER2_TEMP_MAX, BOILER2_INITIAL_TEMP)
     boiler2.client.subscribe('boiler2_actuator')
+    boiler2.client.publish('boiler2_sensor/power', boiler2.power)
+    boiler2.client.publish('boiler2_sensor/temp', boiler2.current_temp)
 
-    for t in range(int(HORIZON/SIMU_TIMESTEP)):
+    for t in SIMU_STEPS:
         if not (boiler2.time % CONTROL_TIMESTEP): #only true when model timestep is a multiple of control period (model has to wait for control period)
+            print('waiting for boiler 2 to receive control. boiler2 time:', boiler2.time_step)
             while not boiler2.control_received:
-                pass
+                time.sleep(0.001)
+        print(cname, "t =", t)
         boiler2.client.publish('boiler2_sensor/temp', boiler2.current_temp)
         time.sleep(0.0001)
         boiler2.client.publish('boiler2_sensor/power', boiler2.power)

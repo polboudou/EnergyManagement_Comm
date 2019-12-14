@@ -56,29 +56,36 @@ C_BOILER = CONTROL_TIMESTEP / (4.186 * 997 * BOILER1_VOLUME)   # boiler thermal 
 # Control algorithm
 def algo_scenario2(boiler_states, p_x):
 
-    u_B = {1: boiler_states[1][POWER], 2: boiler_states[2][POWER]}
-    if p_x <= 0:
-        u_B = {1: 0, 2: 0}
+
+    u_B = {1: 0, 2: 0}
+    #u_B = {1: boiler_states[1][POWER], 2: boiler_states[2][POWER]}
+    #if p_x <= 0:
+    #    u_B = {1: 0, 2: 0}
     hyst_states = {1: 0, 2: 0}
-    p_x = p_x + boiler_states[1][POWER] + boiler_states[2][POWER]
+    #p_x = p_x + boiler_states[1][POWER] + boiler_states[2][POWER]
     boiler_states_sorted = sorted(boiler_states.items(), key=operator.itemgetter(1))
     for (boiler, state) in boiler_states_sorted:
 
-        if state[HYST] == 1:
-            u_B[boiler] = BOILERS_RATED_P[boiler]
-            p_x = p_x - state[POWER] + u_B[boiler]
-        else:
-            if p_x > 0:
-                error_Temp = max(0, BOILERS_TEMP_MAX[boiler] - state[TEMP])
-                u_B[boiler] = max(- error_Temp / C_BOILER, BOILERS_RATED_P[boiler], -(p_x - state[POWER]))
-                p_x = p_x - state[POWER] + u_B[boiler]
-
+        print("boiler", boiler, 'state temp ', state[TEMP])
         if state[TEMP] >= BOILERS_TEMP_DELTA[boiler]:
             hyst_states[boiler] = 0
         elif state[TEMP] <= BOILERS_TEMP_MIN[boiler]:
             hyst_states[boiler] = 1
         else:
             hyst_states[boiler] = state[HYST]
+
+        if hyst_states[boiler] == 1:
+            u_B[boiler] = BOILERS_RATED_P[boiler]
+            p_x += u_B[boiler]
+        else:
+            print('px ', p_x)
+            if p_x > 0:
+                error_Temp = max(0, BOILERS_TEMP_MAX[boiler] - state[TEMP])
+                print('boiler', boiler, "- error_Temp / C_BOILER, BOILERS_RATED_P[boiler], -(p_x - state[POWER])", - error_Temp / C_BOILER, BOILERS_RATED_P[boiler], -p_x)
+                u_B[boiler] = max(- error_Temp / C_BOILER, BOILERS_RATED_P[boiler], -p_x)
+                p_x += u_B[boiler]
+
+
 
     outputs = {'actions': u_B, 'hyst_states': hyst_states}
     return outputs
@@ -95,8 +102,16 @@ def algo_scenario3(boiler_states, p_x, battery_state):
     p_x = p_x + boiler_states[1][POWER] + boiler_states[2][POWER] + battery_state[POWER]
     boiler_states_sorted = sorted(boiler_states.items(), key=operator.itemgetter(1))
     for (boiler, state) in boiler_states_sorted:
+        # setting hysteresis state variable
+        if state[TEMP] >= BOILERS_TEMP_DELTA[boiler]:
+            hyst_states[boiler] = 0
+        elif state[TEMP] <= BOILERS_TEMP_MIN[boiler]:
+            hyst_states[boiler] = 1
+        else:
+            hyst_states[boiler] = state[HYST]
 
-        if state[HYST] == 1:
+        # determining control action
+        if hyst_states[boiler] == 1:
             u[boiler] = BOILERS_RATED_P[boiler]
             p_x = p_x - state[POWER] + u[boiler]
         else:
@@ -105,12 +120,7 @@ def algo_scenario3(boiler_states, p_x, battery_state):
                 u[boiler] = max(- error_Temp / C_BOILER, BOILERS_RATED_P[boiler], -(p_x - state[POWER]))
                 p_x = p_x - state[POWER] + u[boiler]
 
-        if state[TEMP] >= BOILERS_TEMP_DELTA[boiler]:
-            hyst_states[boiler] = 0
-        elif state[TEMP] <= BOILERS_TEMP_MIN[boiler]:
-            hyst_states[boiler] = 1
-        else:
-            hyst_states[boiler] = state[HYST]
+
     if p_x > 0:
         u['bat'] = max((battery_state[SOC] - SOC_MAX)/(CONTROL_TIMESTEP/60), PMAX_CH , -(p_x - battery_state[POWER]))
         '''print("px bigger than 0, and u = ", u['bat'])
@@ -137,18 +147,19 @@ def algo_scenario0(boiler_states):
     boiler_states_sorted = sorted(boiler_states.items(), key=operator.itemgetter(1))
 
     for (boiler, state) in boiler_states_sorted:
-
-        if state[HYST] == 1:
-            u_B[boiler] = BOILERS_RATED_P[boiler]
-        else:
-            u_B[boiler] = 0
-
+        # determining hysteresis state variables
         if state[TEMP] >= BOILERS_TEMP_DELTA[boiler]:
             hyst_states[boiler] = 0
         elif state[TEMP] <= BOILERS_TEMP_MIN[boiler]:
             hyst_states[boiler] = 1
         else:
             hyst_states[boiler] = state[HYST]
+        # setting control actions
+        if hyst_states[boiler] == 1:
+            u_B[boiler] = BOILERS_RATED_P[boiler]
+        else:
+            u_B[boiler] = 0
+
 
     outputs = {'actions': u_B, 'hyst_states': hyst_states}
     return outputs
