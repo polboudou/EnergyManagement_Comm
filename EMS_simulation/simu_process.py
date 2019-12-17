@@ -4,14 +4,14 @@ import sys
 
 # define constants
 HORIZON = 1440*60  # in minutes, corresponds to 24 hours
-HORIZON = 60*60  # for testing purposes
+#HORIZON = 60*60  # for testing purposes
 #HORIZON = 720  # for testing purposes
 
 MPC_START_TIME = '05.01.2018 00:00:00'  # pandas format mm.dd.yyyy hh:mm:ss
 SIMU_TIMESTEP = 30
-CONTROL_TIMESTEP = 5*60    # in minutes
+CONTROL_TIMESTEP = 10*60    # in minutes
 
-scenario = 'Scenario2'
+scenario = 'MPCboilers'
 
 
 BOILER1_TEMP_MIN = 40  # in degree celsius

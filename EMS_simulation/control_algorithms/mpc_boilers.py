@@ -5,6 +5,9 @@ from datetime import timedelta
 from datetime import datetime
 from scipy.optimize import linprog
 import random
+from scipy import interpolate
+import numpy as np
+
 
 # import scipy as scipy
 # print (scipy.version.version)
@@ -29,9 +32,9 @@ TIME_SLOT = 10 # in minutes
 #HORIZON = 20 # in minutes, corresponds to 24 hours
 HORIZON = 1440 # in minutes, corresponds to 24 hours
 #HORIZON = 720  # for testing purposes
+HORIZON = 60  # for testing purposes
 
 MPC_START_TIME = '05.01.2018 00:00:00' # pandas format mm.dd.yyyy hh:mm:ss
-
 
 BOILER1_TEMP_MIN = 40 # in degree celsius
 BOILER1_TEMP_MAX = 50 # in degree celsius
@@ -50,45 +53,63 @@ BOILER2_VOLUME = 800 # in litres
 
 no_slots = int(HORIZON / TIME_SLOT)
 
+
+def get_hot_water_usage_forecast():
+
+	df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
+	hot_water_usage = df['Hot water usage (litres)'].to_numpy() / (10/TIME_SLOT) # data is in [litres*10min]    # divided by 2 for [litres*5min]
+	hot_water_usage = np.repeat(hot_water_usage, int(10/TIME_SLOT))
+	dates = pd.date_range(start=MPC_START_TIME, end='05.05.2018 23:55:00', freq=str(TIME_SLOT)+'min')
+	df = pd.DataFrame(hot_water_usage, index=dates)
+	return df
+
 def get_excess_power_forecast(iteration):
 	df = pd.read_excel('data_input/Energie - 00003 - Pache.xlsx', index_col=[0], usecols=[0,1])
-	df['excess_power (kW) (Psolar - Pload)'] = df['Flux energie au point d\'injection (kWh)'] * -6 # Convert the energy (kWh) to power (kW) and power convention (buy positive and sell negative)
-	del df['Flux energie au point d\'injection (kWh)'] # we do not need the energy column anymore
 
 	start_index = df.index[df.index == (MPC_START_TIME)][0] # df.index returns a list
 	start_index += timedelta(minutes=iteration*TIME_SLOT)
 	end_index = start_index + timedelta(minutes = HORIZON - TIME_SLOT)
-	excess_power_forecast_df = df.loc[start_index:end_index]
-	#excess_power_forecast_df.plot.line(y='excess_power (kW) (Psolar - Pload)')
-	#plt.savefig('../../figs_output/power_profile_at_connection_point_05mai2018.pdf')
-	return excess_power_forecast_df
+	df = df.loc[start_index:end_index] * (-6000) # Convert the energy (kWh) to power (W) and power convention (buy positive and sell negative)
+	excess = df['Flux energie au point d\'injection (kWh)'].to_numpy()
+	excess = np.repeat(excess, int(10/TIME_SLOT))
+	dates = pd.date_range(start=start_index, end=end_index, freq=str(TIME_SLOT) + 'min')
+	df = pd.DataFrame(excess, index=dates)
+
+	return df
 
 
-def get_hot_water_usage_forecast():
+def gggget_hot_water_usage_forecasttttt():
 	df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
 	#df.plot.line(y='Hot water usage (litres)')
 	#plt.savefig('../../figs_output/hot_water_usage_profile_24hrs.pdf')
+	df = df['Hot water usage (litres)'].to_numpy()
+	df = np.repeat(df, int(10 / TIME_SLOT))
+	dates = pd.date_range(start=MPC_START_TIME, end='05.05.2018 23:55:00', freq=str(TIME_SLOT) + 'min')
+	df = pd.DataFrame(df, index=dates)
 	return df
 	
 
 def get_energy_sell_price():
-	df = pd.read_excel('data_input/energy_sell_price_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
-	#df.plot.line(y='Sell Price (CHF / kWh)')
-	#plt.savefig('../../figs_output/energy_sell_price_24hrs.pdf')
+	df = pd.read_excel('data_input/energy_sell_price_10min_granularity.xlsx', index_col=[0], usecols=[0,1]).to_numpy()
+	df = np.repeat(df, int(10 / TIME_SLOT))
+	dates = pd.date_range(start=MPC_START_TIME, end='05.05.2018 23:55:00', freq=str(TIME_SLOT) + 'min')
+	df = pd.DataFrame(df, index=dates)
 	return df
 
 
 def get_energy_buy_price():
-	df = pd.read_excel('data_input/energy_buy_price_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
-	#df.plot.line(y='Buy Price (CHF / kWh)')
-	#plt.savefig('../../figs_output/energy_buy_price_24hrs.pdf')
+	df = pd.read_excel('data_input/energy_buy_price_10min_granularity.xlsx', index_col=[0], usecols=[0,1]).to_numpy()
+	#df.plot.line(y='Hot water usage (litres)')
+	#plt.savefig('../../figs_output/hot_water_usage_profile_24hrs.pdf')
+	df = np.repeat(df, int(10 / TIME_SLOT))
+	dates = pd.date_range(start=MPC_START_TIME, end='05.05.2018 23:55:00', freq=str(TIME_SLOT) + 'min')
+	df = pd.DataFrame(df, index=dates)
 	return df
 
 
-def mpciteration(T_B1_init, T_B2_init, iteration):
+def mpc_iteration(T_B1_init, T_B2_init, iteration):
 	# Get disturbance forecasts
 	# 1. Get excess solar power forecasts
-
 	excess_power_forecast_df = get_excess_power_forecast(iteration)
 
 	# 2. Get hot water consumption volume forecast
@@ -101,14 +122,12 @@ def mpciteration(T_B1_init, T_B2_init, iteration):
 
 
 	############ Set up the optimisation problem
-	print(iteration)
 
 	current_time = datetime.strptime(MPC_START_TIME, "%m.%d.%Y %H:%M:%S") + timedelta(minutes=iteration*TIME_SLOT)
 	print(current_time)
 
 	indices = []
 	indices.append(current_time)
-	print(current_time)
 
 	NO_CTRL_VARS_PS = 6 # control (decision) variables are Epsilon, Pg, Pb1, Pb2, Tb1, Tb2 for each time slot
 	no_ctrl_vars = NO_CTRL_VARS_PS * no_slots
@@ -136,7 +155,6 @@ def mpciteration(T_B1_init, T_B2_init, iteration):
 
 		# 3. Setup equality constraints
 		excess_power_forecast_index = excess_power_forecast_df.index[excess_power_forecast_df.index == current_time][0] # df.index returns a list
-
 		excess_power_forecast = excess_power_forecast_df.loc[excess_power_forecast_index]
 		#excess_power_forecast[0] = 1 # for testing purposes
 		# if random.uniform(0,1) <= 0.5:
@@ -152,7 +170,7 @@ def mpciteration(T_B1_init, T_B2_init, iteration):
 		#print (row)
 		A_eq.append(row)
 		#print (A_eq)
-		b_eq.append(excess_power_forecast[0] * -1000) # converting kW to Watts and excess power is defined as Psolar - Pload (both positive values)
+		b_eq.append(excess_power_forecast[0]) # converting kW to Watts and excess power is defined as Psolar - Pload (both positive values)
 		#print (b_eq)
 
 		# Boiler 1 and 2 are connected in series. The newV is the same for both boilers in this case.
@@ -206,13 +224,13 @@ def mpciteration(T_B1_init, T_B2_init, iteration):
 		current_buy_price = energy_buy_price_df.loc[buy_index] # per unit (kWh) energy price
 		row = [0] * no_ctrl_vars
 		row[x * NO_CTRL_VARS_PS] = -1
-		row[x * NO_CTRL_VARS_PS + 1] = current_buy_price[0] / (6 * 1000) # converting it to price per watt-10minutes
+		row[x * NO_CTRL_VARS_PS + 1] = current_buy_price[0] / ((60/TIME_SLOT) * 1000) # converting it to price per watt-INTERVALminutes
 		A_ub.append(row)
 		b_ub.append(0)
 
 		row = [0] * no_ctrl_vars
 		row[x * NO_CTRL_VARS_PS] = -1
-		row[x * NO_CTRL_VARS_PS + 1] = current_sell_price[0] / (6 * 1000) # converting it to price per watt-second
+		row[x * NO_CTRL_VARS_PS + 1] = current_sell_price[0] / ((60/TIME_SLOT) * 1000) # converting it to price per watt-second
 		A_ub.append(row)
 		b_ub.append(0)
 
@@ -275,8 +293,9 @@ def mpciteration(T_B1_init, T_B2_init, iteration):
 
 	# outputs = {1: pb1[0], 2: pb2[0]]}
 	x=0
-	outputs = {1: res.x[2]*1000, 2: res.x[3]*1000}
+	outputs = {1: res.x[2], 2: res.x[3]}
 	return outputs
+
 
 '''
 

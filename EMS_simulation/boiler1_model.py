@@ -9,7 +9,7 @@ import time
 
 
 SIMU_TIMESTEP = 30  # in minutes
-CONTROL_TIMESTEP = 5*60   # in minutes
+CONTROL_TIMESTEP = 10*60   # in minutes
 HORIZON = 1440*60  # in minutes, corresponds to 24 hours
 #HORIZON = 720  # for testing purposes
 HORIZON = 60*60  # for testing purposes
@@ -43,12 +43,11 @@ class Boiler():
         self.time = 0
         self.control_received = False
         self.model()    # launch model simulation
-        self.time_step -= 1
-        self.time -= self.dt
+        self.time_step = 0
+        self.time = 0
 
     def model(self):
         # T[h+1] = A * T[h] + C * P[h] + D * T_inlet[h]
-        print("boiler 1, no entiendo, timestep ", self.time_step)
         A = 1 - self.hot_water_usage[self.time_step] / BOILER1_VOLUME
         D = self.hot_water_usage[self.time_step] / BOILER1_VOLUME
         self.current_temp = A * self.current_temp - C_BOILER1 * self.dt * self.power + D * BOILER1_TEMP_INCOMING_WATER
@@ -112,7 +111,6 @@ def message_handler(client, msg):
         #print("msg.payload ", msg.payload)
         boiler1.power = float(msg.payload)
         boiler1.control_received = True
-        print("BOILER 1111111111111111")
 
 
 if __name__ == '__main__':
@@ -122,16 +120,16 @@ if __name__ == '__main__':
     r = random.randrange(1, 100000)
     cname = "Boiler1_" + str(r)     # broker doesn't like when two clients with same name connect
     boiler1 = Boiler(cname, SIMU_TIMESTEP, BOILER1_RATED_P, BOILER1_TEMP_MIN, BOILER1_TEMP_MAX, BOILER1_INITIAL_TEMP)
+
     boiler1.client.subscribe('boiler1_actuator')
     boiler1.client.publish('boiler1_sensor/power', boiler1.power)
     boiler1.client.publish('boiler1_sensor/temp', boiler1.current_temp)
 
     for t in SIMU_STEPS:
         if not (boiler1.time % CONTROL_TIMESTEP):
-            print('waiting for boiler 1 to receive control. boiler1 time:', boiler1.time_step)
+            #print('waiting for boiler 1 to receive control. boiler1 time:', boiler1.time_step)
             while not boiler1.control_received:
                 time.sleep(0.001)
-        print(cname, 't= ', t)
         boiler1.client.publish('boiler1_sensor/temp', boiler1.current_temp)
         time.sleep(0.0001)
         boiler1.client.publish('boiler1_sensor/power', boiler1.power)
@@ -140,4 +138,5 @@ if __name__ == '__main__':
         boiler1.control_received = False
 
     boiler1.client.loop_stop()
+    boiler1.client.disconnect(broker_address)
     boiler1.client.disconnect(broker_address)

@@ -7,10 +7,10 @@ import paho.mqtt.client as mqtt # import the client
 import time
 
 SIMU_TIMESTEP = 30  # in minutes
-CONTROL_TIMESTEP = 5*60   # in minutes
+CONTROL_TIMESTEP = 10*60   # in minutes
 HORIZON = 1440*60  # in minutes, corresponds to 24 hours
 #HORIZON = 720  # for testing purposes
-HORIZON = 60*60  # for testing purposes
+#HORIZON = 60*60  # for testing purposes
 
 SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP))
 
@@ -33,12 +33,14 @@ class Battery():
         self.current_soc = current_soc
         self.current_power = 0
         self.client = self.setup_client()
-        #self.time_step = 0
+        self.time_step = 0
+        self.model()
+        self.time_step = 0
         self.control_received = False
 
     def model(self):
-        self.current_soc = self.current_soc - (self.dt/60) * self.current_power
-        print("model current soc =", self.current_soc)
+        self.current_soc = self.current_soc - (self.dt/3600) * self.current_power
+        #print("model current soc =", self.current_soc)
         self.time_step += self.dt
 
 
@@ -87,10 +89,12 @@ if __name__ == '__main__':
     cname = "Battery_" + str(r)     # broker doesn't like when two clients with same name connect
     battery = Battery(cname, SIMU_TIMESTEP, PMAX_CH, PMAX_DISCH, SOC_MIN, SOC_MAX, current_soc=SOC_MIN)
     battery.client.subscribe('batteryMS')
+    battery.client.publish('boiler2_sensor/power', battery.current_power)
+    battery.client.publish('boiler2_sensor/temp', battery.current_soc)
 
-    for t in SIMU_TIMESTEP:
+    for t in SIMU_STEPS:
         if not (battery.time_step % CONTROL_TIMESTEP):
-            print("Battery period ", t, "min")
+            #print("Battery period ", t, "min")
             while not battery.control_received:
                 pass
         battery.client.publish('battery/soc', battery.current_soc)
