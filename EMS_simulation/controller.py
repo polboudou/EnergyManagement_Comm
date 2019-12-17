@@ -19,12 +19,12 @@ broker_address ="mqtt.teserakt.io"   # use external broker (alternative broker a
 HORIZON = 1440*60  # in seconds, corresponds to 24 hours
 #HORIZON = 720  # for testing purposes
 HORIZON = 60*60  # for testing purposes
-MPC_START_TIME = '05.01.2018 12:00:00'  # pandas format mm.dd.yyyy hh:mm:ss
+MPC_START_TIME = '05.01.2018 00:00:00'  # pandas format mm.dd.yyyy hh:mm:ss
 SIMU_TIMESTEP = 30
-CONTROL_TIMESTEP = 5*60    # in minutes
+CONTROL_TIMESTEP = 10*60    # in minutes
 
 # choose between 'Scenario0' to 'Scenario3'
-scenario = 'Scenario2'
+scenario = 'MPCboilers'
 
 BOILER1_TEMP_MIN = 40  # in degree celsius
 BOILER1_TEMP_MAX = 50  # in degree celsius
@@ -44,6 +44,7 @@ BOILER2_INITIAL_TEMP = 36  # in degree celsius
 
 CONTROL_STEPS = range(0, int(HORIZON/SIMU_TIMESTEP), int(CONTROL_TIMESTEP/SIMU_TIMESTEP))
 #CONTROL_STEPS = range(int(HORIZON/CONTROL_TIMESTEP))
+
 
 SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP))
 
@@ -76,7 +77,7 @@ class Controller():
 
         if 'MPCboilers' in self.description:
             start = time.time()
-            output = mpc_boilers.mpciteration(self.Tb1, self.Tb2, self.control_iter)
+            output = mpc_boilers.mpc_iteration(self.Tb1, self.Tb2, self.control_iter)
             print("---------MPC computing time =", time.time()-start)
             print("outputs mpc:", output)
             self.control_iter += 1
@@ -85,7 +86,7 @@ class Controller():
         if 'MPCbattery' in self.description:
             print("battery soc ", self.soc_bat)
             start = time.time()
-            output = mpc_batteries.mpciteration(self.Tb1, self.Tb2, self.soc_bat, self.control_iter)
+            output = mpc_batteries.mpc_iteration(self.Tb1, self.Tb2, self.soc_bat, self.control_iter)
             print("---------MPC computing time =", time.time()-start)
             print("outputs mpc:", output)
             self.control_iter += 1
@@ -194,22 +195,22 @@ def message_handler(client, msg):
     if msg.topic == 'boiler1_sensor/power':
         controller.pb1 = float(msg.payload)
         controller.pb1_list.append(controller.pb1)
-        print("controller.pb1_list", controller.pb1_list)
+        #print("controller.pb1_list", controller.pb1_list)
 
     if msg.topic == 'boiler1_sensor/temp':
         controller.Tb1 = float(msg.payload)
         controller.Tb1_list.append(controller.Tb1)
-        print("controller.Tb1_list", controller.Tb1_list)
+        #print("controller.Tb1_list", controller.Tb1_list)
 
     if msg.topic == 'boiler2_sensor/power':
         controller.pb2 = float(msg.payload)
         controller.pb2_list.append(controller.pb2)
-        print("controller.pb2_list", controller.pb2_list)
+        #print("controller.pb2_list", controller.pb2_list)
 
     if msg.topic == 'boiler2_sensor/temp':
         controller.Tb2 = float(msg.payload)
         controller.Tb2_list.append(controller.Tb2)
-        print("controller.Tb2_list", controller.Tb2_list)
+        #print("controller.Tb2_list", controller.Tb2_list)
 
     if msg.topic == 'battery/soc':
         controller.soc_bat = float(msg.payload)
@@ -232,19 +233,14 @@ if __name__ == '__main__':
     controller.client.subscribe("boiler2_sensor/power")
     controller.client.subscribe("boiler1_sensor/temp")
     controller.client.subscribe("boiler1_sensor/power")
-
-    #controller.client.publish('boiler2_actuator', 0)
-    #controller.client.publish('boiler1_actuator', 0)
     if scenario == 'Scenario3' or scenario == 'MPCbattery':
         controller.client.subscribe("battery/soc")
         controller.client.subscribe("battery/power")
-        #controller.client.publish('batteryMS', 0)
 
     sell_price = get_energy_sell_price()
     buy_price = get_energy_buy_price()
     p_x = get_excess_power_forecast()
     p_x_measured = get_excess_power_simulation(p_x)
-
 
     # wait until receives first measurements of b1, b2
     while controller.Tb1 == 0 or controller.Tb2 == 0:
@@ -256,10 +252,8 @@ if __name__ == '__main__':
         #time.sleep(0.1)
         #controller.client.publish(' boilers', 'Request measurement')
         print("controller period at", h, 'min')
-        print("boiler1 measurements ", len(controller.Tb1_list))
-        print("boiler2 measurements ", len(controller.Tb2_list))
-        time.sleep(1*(CONTROL_TIMESTEP/SIMU_TIMESTEP))
-
+        time.sleep(0.05*(CONTROL_TIMESTEP/SIMU_TIMESTEP))
+        print("len(controller.pb1), len(controller.Tb2) ", len(controller.pb1_list), len(controller.Tb2_list))
         actions = controller.run_algorithm(p_x[h])
         print('actions ', actions)
 
@@ -268,11 +262,8 @@ if __name__ == '__main__':
         if scenario == 'Scenario3' or scenario == 'MPCbattery':
             controller.client.publish('batteryMS', str(actions['bat']))
 
-        time.sleep(0.1 * (CONTROL_TIMESTEP / SIMU_TIMESTEP))
-
-
+    time.sleep(1)
     controller.client.publish('boilers', 'End')
-    time.sleep(0.1)
     controller.client.loop_stop()
     controller.client.disconnect(broker_address)
 

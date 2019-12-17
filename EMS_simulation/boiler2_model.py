@@ -9,7 +9,7 @@ import time
 
 
 SIMU_TIMESTEP = 30                   # in minutes
-CONTROL_TIMESTEP = 5*60                # in minutes
+CONTROL_TIMESTEP = 10*60                # in minutes
 HORIZON = 1440*60                  # in minutes, corresponds to 24 hours
 #HORIZON = 720  # for testing purposes
 HORIZON = 60*60  # for testing purposes
@@ -43,8 +43,8 @@ class Boiler():
         self.time = 0
         self.control_received = False
         self.model()    # launch model simulation
-        self.time_step -= 1
-        self.time -= self.dt
+        self.time_step = 0
+        self.time = 0
 
     def model(self):
         # T[h+1] = A * T[h] + C * P[h] + D * T_inlet[h]
@@ -111,8 +111,6 @@ def message_handler(client, msg):
         #print("msg.payload ", msg.payload)
         boiler2.power = float(msg.payload)
         boiler2.control_received = True
-        print("BOILER 2222222222222222222")
-
 
 if __name__ == '__main__':
 
@@ -127,10 +125,9 @@ if __name__ == '__main__':
 
     for t in SIMU_STEPS:
         if not (boiler2.time % CONTROL_TIMESTEP): #only true when model timestep is a multiple of control period (model has to wait for control period)
-            print('waiting for boiler 2 to receive control. boiler2 time:', boiler2.time_step)
+            #print('waiting for boiler 2 to receive control. boiler2 time:', boiler2.time_step)
             while not boiler2.control_received:
                 time.sleep(0.001)
-        print(cname, "t =", t)
         boiler2.client.publish('boiler2_sensor/temp', boiler2.current_temp)
         time.sleep(0.0001)
         boiler2.client.publish('boiler2_sensor/power', boiler2.power)

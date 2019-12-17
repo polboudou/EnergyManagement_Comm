@@ -57,7 +57,7 @@ no_slots = int(HORIZON / TIME_SLOT)
 
 def get_excess_power_forecast(iteration):
 	df = pd.read_excel('data_input/Energie - 00003 - Pache.xlsx', index_col=[0], usecols=[0,1])
-	df['excess_power (kW) (Psolar - Pload)'] = df['Flux energie au point d\'injection (kWh)'] * -6 # Convert the energy (kWh) to power (kW) and power convention (buy positive and sell negative)
+	df['excess_power (kW) (Psolar - Pload)'] = df['Flux energie au point d\'injection (kWh)'] * -6000 # Convert the energy (kWh) to power (kW) and power convention (buy positive and sell negative)
 	del df['Flux energie au point d\'injection (kWh)'] # we do not need the energy column anymore
 
 	start_index = df.index[df.index == (MPC_START_TIME)][0] # df.index returns a list
@@ -90,7 +90,7 @@ def get_energy_buy_price():
 	return df
 
 
-def mpciteration(T_B1_init, T_B2_init, soc_bat_init, iteration):
+def mpc_iteration(T_B1_init, T_B2_init, soc_bat_init, iteration):
 
     if T_B2_init <= 30:
         T_B2_init = 30
@@ -170,8 +170,7 @@ def mpciteration(T_B1_init, T_B2_init, soc_bat_init, iteration):
         #print (row)
         A_eq.append(row)
         # print (A_eq)
-        b_eq.append(excess_power_forecast[
-                        0] * -1000)  # converting kW to Watts and excess power is defined as Psolar - Pload (both positive values)
+        b_eq.append(excess_power_forecast[0])
         # print (b_eq)
 
         #######################     Battery model     ##########################
