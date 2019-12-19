@@ -12,7 +12,7 @@ SIMU_TIMESTEP = 30
 CONTROL_TIMESTEP = 5*60    # in minutes
 
 scenario = 'MPCbattery'
-scenario = 'MPCboilers'
+#scenario = 'MPCboilers'
 
 
 BOILER1_TEMP_MIN = 40  # in degree celsius

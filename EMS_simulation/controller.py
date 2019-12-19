@@ -25,7 +25,7 @@ CONTROL_TIMESTEP = 10*60    # in minutes
 
 # choose between 'Scenario0' to 'Scenario3'
 scenario = 'MPCbattery'
-scenario = 'MPCboilers'
+#scenario = 'MPCboilers'
 
 BOILER1_TEMP_MIN = 40  # in degree celsius
 BOILER1_TEMP_MAX = 50  # in degree celsius
@@ -246,7 +246,11 @@ if __name__ == '__main__':
     # wait until receives first measurements of b1, b2
     while controller.Tb1 == 0 or controller.Tb2 == 0:
         time.sleep(0.01)
+    if scenario == 'Scenario3' or scenario == 'MPCbattery':
+        while controller.soc_bat == 0:
+            time.sleep(0.01)
 
+    print("entramos")
 
     for h in CONTROL_STEPS:
     #for h in range(2):
@@ -312,7 +316,7 @@ if __name__ == '__main__':
     ax2.legend(loc=1)
     ax.legend(loc=2)
     # plt.show()
-    plt.savefig('testmpcboilers.pdf')
+    plt.savefig('simu_output/'+scenario+'.pdf')
 
     cost = 0
     for h in SIMU_STEPS:

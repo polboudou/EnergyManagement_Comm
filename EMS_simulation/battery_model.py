@@ -89,14 +89,14 @@ if __name__ == '__main__':
     cname = "Battery_" + str(r)     # broker doesn't like when two clients with same name connect
     battery = Battery(cname, SIMU_TIMESTEP, PMAX_CH, PMAX_DISCH, SOC_MIN, SOC_MAX, current_soc=SOC_MIN)
     battery.client.subscribe('batteryMS')
-    battery.client.publish('boiler2_sensor/power', battery.current_power)
-    battery.client.publish('boiler2_sensor/temp', battery.current_soc)
+    battery.client.publish('battery/power', battery.current_power)
+    battery.client.publish('battery/soc', battery.current_soc)
 
     for t in SIMU_STEPS:
         if not (battery.time_step % CONTROL_TIMESTEP):
             #print("Battery period ", t, "min")
             while not battery.control_received:
-                pass
+                time.sleep(0.001)
         battery.client.publish('battery/soc', battery.current_soc)
         time.sleep(0.0001)
         battery.client.publish('battery/power', battery.current_power)

@@ -45,8 +45,8 @@ BOILER2_RATED_P = 7600 # in Watts
 BOILER1_VOLUME = 800 # in litres
 BOILER2_VOLUME = 800 # in litres
 
-BOILER1_INITIAL_TEMP = 45 # in degree celsius (TODO would come from the measurements!)
-BOILER2_INITIAL_TEMP = 45 # in degree celsius (TODO would come from the measurements)
+BOILER1_INITIAL_TEMP = 45 # in degree celsius
+BOILER2_INITIAL_TEMP = 45 # in degree celsius
 
 
 
@@ -179,7 +179,6 @@ def main():
 		if x == 0:
 			#print (row)
 			A_eq.append(row)
-			#print (A_eq)
 			b_eq.append(Ab1 * BOILER1_INITIAL_TEMP + Cb1 * BOILER2_INITIAL_TEMP)
 
 			row = [0] * no_ctrl_vars
@@ -191,7 +190,7 @@ def main():
 			b_eq.append(Ab2 * BOILER2_INITIAL_TEMP + Db2)
 		else:# variables are Epsilon, Pg, Pb1, Pb2, Tb1, Tb2
 			row[x * NO_CTRL_VARS_PS - 2] = -Ab1
-			row[x * NO_CTRL_VARS_PS - 1] = -Cb1
+			row[x * NO_CTRL_VARS_PS - 1] =  -Cb1
 			A_eq.append(row)
 			b_eq.append(0)
 
@@ -261,9 +260,9 @@ def main():
 	temp_boiler1.append(BOILER1_INITIAL_TEMP)
 	temp_boiler2.append(BOILER2_INITIAL_TEMP)
 	for x in range(no_slots):
-		power_pcc.append(res.x[x * NO_CTRL_VARS_PS + 1])
-		power_boiler1.append(res.x[x * NO_CTRL_VARS_PS + 2])
-		power_boiler2.append(res.x[x * NO_CTRL_VARS_PS + 3])
+		power_pcc.append(-res.x[x * NO_CTRL_VARS_PS + 1])
+		power_boiler1.append(-res.x[x * NO_CTRL_VARS_PS + 2])
+		power_boiler2.append(-res.x[x * NO_CTRL_VARS_PS + 3])
 		temp_boiler1.append(res.x[x * NO_CTRL_VARS_PS + 4])
 		temp_boiler2.append(res.x[x * NO_CTRL_VARS_PS + 5])
 
