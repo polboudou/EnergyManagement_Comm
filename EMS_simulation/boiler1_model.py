@@ -11,8 +11,8 @@ import time
 SIMU_TIMESTEP = 30  # in minutes
 CONTROL_TIMESTEP = 10*60   # in minutes
 HORIZON = 1440*60  # in minutes, corresponds to 24 hours
-#HORIZON = 720  # for testing purposes
-HORIZON = 60*60  # for testing purposes
+#HORIZON = 720*60  # for testing purposes
+#HORIZON = 60*60  # for testing purposes
 
 SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP))
 
@@ -51,9 +51,6 @@ class Boiler():
         A = 1 - self.hot_water_usage[self.time_step] / BOILER1_VOLUME
         D = self.hot_water_usage[self.time_step] / BOILER1_VOLUME
         self.current_temp = A * self.current_temp - C_BOILER1 * self.dt * self.power + D * BOILER1_TEMP_INCOMING_WATER
-        #print('current temp boiler1 ', self.current_temp)
-        #print('current power boiler1 ', self.power)
-
         self.time_step += 1
         self.time += self.dt
 
@@ -138,5 +135,4 @@ if __name__ == '__main__':
         boiler1.control_received = False
 
     boiler1.client.loop_stop()
-    boiler1.client.disconnect(broker_address)
     boiler1.client.disconnect(broker_address)

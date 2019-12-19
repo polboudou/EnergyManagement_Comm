@@ -11,8 +11,8 @@ import time
 SIMU_TIMESTEP = 30                   # in minutes
 CONTROL_TIMESTEP = 10*60                # in minutes
 HORIZON = 1440*60                  # in minutes, corresponds to 24 hours
-#HORIZON = 720  # for testing purposes
-HORIZON = 60*60  # for testing purposes
+#HORIZON = 720*60  # for testing purposes
+#HORIZON = 60*60  # for testing purposes
 
 SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP))
 

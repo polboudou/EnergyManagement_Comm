@@ -17,13 +17,14 @@ broker_address ="mqtt.teserakt.io"   # use external broker (alternative broker a
 
 
 HORIZON = 1440*60  # in seconds, corresponds to 24 hours
-#HORIZON = 720  # for testing purposes
-HORIZON = 60*60  # for testing purposes
+#HORIZON = 720*60  # for testing purposes
+#HORIZON = 60*60  # for testing purposes
 MPC_START_TIME = '05.01.2018 00:00:00'  # pandas format mm.dd.yyyy hh:mm:ss
 SIMU_TIMESTEP = 30
 CONTROL_TIMESTEP = 10*60    # in minutes
 
 # choose between 'Scenario0' to 'Scenario3'
+scenario = 'MPCbattery'
 scenario = 'MPCboilers'
 
 BOILER1_TEMP_MIN = 40  # in degree celsius
@@ -268,7 +269,7 @@ if __name__ == '__main__':
     controller.client.disconnect(broker_address)
 
     # computing cost
-
+    #TODO: pop the first value of state lists
     print("pb1_list = ", controller.pb1_list)
     print("pb2_list = ", controller.pb2_list)
     print("Tb1_list = ", controller.Tb1_list)
@@ -287,11 +288,37 @@ if __name__ == '__main__':
     print("len(soc_bat_list = ", len(controller.soc_bat_list))
     print("len(p_x) = ", len(p_x))
 
+    fig, ax = plt.subplots(1, 1)
+    ax.plot(range(len(controller.pb1_list)), controller.pb1_list, label='Power B1', color='blue', linestyle='-.')
+    ax.plot(range(len(controller.pb2_list)), controller.pb2_list, label='Power B2', color='cyan', alpha=0.7)
+    ax.plot(range(len(controller.p_bat_list)), controller.p_bat_list, label='Power battery', color='green', alpha=0.7)
+    ax.plot(range(len(p_x)), p_x, label='P_pv - P_load', color='grey', alpha=0.7)
+    ax.plot(range(len(p_x)), [0 for i in range(len(p_x))], color='black', linestyle='-.')
+    ax.set_title('mpc boilers')
+
+    ax2 = ax.twinx()
+    ax2.plot(range(len(controller.Tb1_list)), [40 for i in range(len(controller.Tb1_list))], color='red', linestyle='-.',
+             linewidth=0.7)
+    ax2.plot(range(len(controller.Tb1_list)), [42 for i in range(len(controller.Tb1_list))], color='red', linestyle='-.',
+             linewidth=0.7)
+    ax2.plot(range(len(controller.Tb1_list)), [30 for i in range(len(controller.Tb1_list))], color='orange', linestyle='-.',
+             linewidth=0.7)
+    ax2.plot(range(len(controller.Tb1_list)), [36 for i in range(len(controller.Tb1_list))], color='orange', linestyle='-.',
+             linewidth=0.7)
+
+    ax2.plot(range(len(controller.Tb1_list)), controller.Tb1_list, label='Temperature B1', color='red')
+    ax2.plot(range(len(controller.Tb2_list)), controller.Tb2_list, label='Temperature B2', color='orange', linestyle='-.')
+    plt.legend()
+    ax2.legend(loc=1)
+    ax.legend(loc=2)
+    # plt.show()
+    plt.savefig('testmpcboilers.pdf')
+
     cost = 0
     for h in SIMU_STEPS:
         p_grid_silutation = (p_x[h] + controller.pb1_list[h] + controller.pb2_list[h]) / (3600/SIMU_TIMESTEP) * 0.001 # convert Watt to kWh
         if scenario == 'Scenario3' or scenario == 'MPCbattery':
-            p_grid_silutation += controller.p_bat_list[h] / SIMU_TIMESTEP * 0.001 # convert Watt to kWh
+            p_grid_silutation += controller.p_bat_list[h] / (3600/SIMU_TIMESTEP) * 0.001 # convert Watt to kWh
 
         if p_grid_silutation > 0:
             cost += p_grid_silutation * sell_price[h]

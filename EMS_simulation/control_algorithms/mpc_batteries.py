@@ -5,6 +5,7 @@ from datetime import timedelta
 from datetime import datetime
 from scipy.optimize import linprog
 import random
+import numpy as np
 
 # import scipy as scipy
 # print (scipy.version.version)
@@ -29,6 +30,7 @@ TIME_SLOT = 10 # in minutes
 #HORIZON = 20 # in minutes, corresponds to 24 hours
 HORIZON = 1440 # in minutes, corresponds to 24 hours
 #HORIZON = 720  # for testing purposes
+#HORIZON = 60  # for testing purposes
 
 MPC_START_TIME = '05.01.2018 00:00:00' # pandas format mm.dd.yyyy hh:mm:ss
 
@@ -38,10 +40,11 @@ BOILER1_TEMP_MAX = 50  # in degree celsius
 BOILER2_TEMP_MIN = 30  # in degree celsius
 BOILER2_TEMP_MAX = 60  # in degree celsius
 
+BOILER1_TEMP_INCOMING_WATER = 20  # in degree celsius
 BOILER2_TEMP_INCOMING_WATER = 20  # in degree celsius
 
-BOILER1_RATED_P = -7700  # in Watts
-BOILER2_RATED_P = -7700  # in Watts
+BOILER1_RATED_P = -7600  # in Watts
+BOILER2_RATED_P = -7600  # in Watts
 
 BOILER1_VOLUME = 800  # in litres
 BOILER2_VOLUME = 800  # in litres
@@ -55,9 +58,10 @@ BATTERY_DISCHARGE_POWER_LIMIT = 5000       # in Watts
 
 no_slots = int(HORIZON / TIME_SLOT)
 
+'''
 def get_excess_power_forecast(iteration):
 	df = pd.read_excel('data_input/Energie - 00003 - Pache.xlsx', index_col=[0], usecols=[0,1])
-	df['excess_power (kW) (Psolar - Pload)'] = df['Flux energie au point d\'injection (kWh)'] * -6000 # Convert the energy (kWh) to power (kW) and power convention (buy positive and sell negative)
+	df['excess_power (kW) (Psolar - Pload)'] = df['Flux energie au point d\'injection (kWh)'] * (-6000) # Convert the energy (kWh) to power (kW) and power convention (buy positive and sell negative)
 	del df['Flux energie au point d\'injection (kWh)'] # we do not need the energy column anymore
 
 	start_index = df.index[df.index == (MPC_START_TIME)][0] # df.index returns a list
@@ -88,22 +92,51 @@ def get_energy_buy_price():
 	#df.plot.line(y='Buy Price (CHF / kWh)')
 	#plt.savefig('../../figs_output/energy_buy_price_24hrs.pdf')
 	return df
+'''
+
+def get_hot_water_usage_forecast():
+
+	df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
+	hot_water_usage = df['Hot water usage (litres)'].to_numpy() / (10/TIME_SLOT)  /2# data is in [litres*10min]    # divided by 2 for [litres*5min]
+
+	hot_water_usage = np.repeat(hot_water_usage, int(10/TIME_SLOT))
+	dates = pd.date_range(start=MPC_START_TIME, end='05.05.2018 23:55:00', freq=str(TIME_SLOT)+'min')
+	df = pd.DataFrame(hot_water_usage, index=dates)
+	return df
+
+def get_excess_power_forecast(iteration):
+	df = pd.read_excel('data_input/Energie - 00003 - Pache.xlsx', index_col=[0], usecols=[0,1])
+
+	start_index = df.index[df.index == (MPC_START_TIME)][0] # df.index returns a list
+	start_index += timedelta(minutes=iteration*TIME_SLOT)
+	end_index = start_index + timedelta(minutes = HORIZON - TIME_SLOT)
+	df = df.loc[start_index:end_index] * (-6000) # Convert the energy (kWh) to power (W) and power convention (buy positive and sell negative)
+	excess = df['Flux energie au point d\'injection (kWh)'].to_numpy()
+	excess = np.repeat(excess, int(10/TIME_SLOT))
+	dates = pd.date_range(start=start_index, end=end_index, freq=str(TIME_SLOT) + 'min')
+	df = pd.DataFrame(excess, index=dates)
+
+	return df
+
+def get_energy_sell_price():
+	df = pd.read_excel('data_input/energy_sell_price_10min_granularity.xlsx', index_col=[0], usecols=[0,1]).to_numpy()
+	df = np.repeat(df, int(10 / TIME_SLOT))
+	dates = pd.date_range(start=MPC_START_TIME, end='05.05.2018 23:55:00', freq=str(TIME_SLOT) + 'min')
+	df = pd.DataFrame(df, index=dates)
+	return df
+
+
+def get_energy_buy_price():
+	df = pd.read_excel('data_input/energy_buy_price_10min_granularity.xlsx', index_col=[0], usecols=[0,1]).to_numpy()
+	#df.plot.line(y='Hot water usage (litres)')
+	#plt.savefig('../../figs_output/hot_water_usage_profile_24hrs.pdf')
+	df = np.repeat(df, int(10 / TIME_SLOT))
+	dates = pd.date_range(start=MPC_START_TIME, end='05.05.2018 23:55:00', freq=str(TIME_SLOT) + 'min')
+	df = pd.DataFrame(df, index=dates)
+	return df
 
 
 def mpc_iteration(T_B1_init, T_B2_init, soc_bat_init, iteration):
-
-    if T_B2_init <= 30:
-        T_B2_init = 30
-    if T_B2_init >= 60:
-        T_B2_init = 60
-    if T_B1_init <= 40:
-        T_B1_init = 40
-    if T_B1_init >= 50:
-        T_B1_init = 50
-    if soc_bat_init <= 100:
-        soc_bat_init = 100
-    if soc_bat_init >= 5000:
-        soc_bat_init = 5000
 
     # Get disturbance forecasts
     # 1. Get excess solar power forecasts
@@ -135,7 +168,7 @@ def mpc_iteration(T_B1_init, T_B2_init, soc_bat_init, iteration):
 
     for x in range(no_slots):
         # 1. Setup the objective function
-        c.append(1)  # variables are Epsilon, Pg, Pb1, Pb2, Tb1, Tb2, Pbat, Ebat for each time slot
+        c.append(-1)  # variables are Epsilon, Pg, Pb1, Pb2, Tb1, Tb2, Pbat, Ebat for each time slot
         c.extend([0, 0, 0, 0, 0, 0, 0])
         # print (c)
 
@@ -155,6 +188,8 @@ def mpc_iteration(T_B1_init, T_B2_init, soc_bat_init, iteration):
         excess_power_forecast_index = excess_power_forecast_df.index[excess_power_forecast_df.index == current_time][
             0]  # df.index returns a list
         excess_power_forecast = excess_power_forecast_df.loc[excess_power_forecast_index]
+        if x == 0:
+            print("excess_power_forecast ", -excess_power_forecast)
         # excess_power_forecast[0] = 1 # for testing purposes
         # if random.uniform(0,1) <= 0.5:
         # 	excess_power_forecast[0] = -random.uniform(0,1) * 50000
@@ -170,7 +205,7 @@ def mpc_iteration(T_B1_init, T_B2_init, soc_bat_init, iteration):
         #print (row)
         A_eq.append(row)
         # print (A_eq)
-        b_eq.append(excess_power_forecast[0])
+        b_eq.append(-excess_power_forecast[0])
         # print (b_eq)
 
         #######################     Battery model     ##########################
@@ -196,59 +231,54 @@ def mpc_iteration(T_B1_init, T_B2_init, soc_bat_init, iteration):
         Ab1 = 1 - newV / BOILER1_VOLUME
         Ab2 = 1 - newV / BOILER2_VOLUME
         Cb1 = newV / BOILER1_VOLUME
-        Db2 = Cb1 * BOILER2_TEMP_INCOMING_WATER
+        Cb2 = newV / BOILER2_VOLUME
         # the specific heat capacity of water (C) is 4.186 joule or watt-second per gram per degree celsius
         # the density of water is 997 grams / litre
         Bb1 = (TIME_SLOT * 60) / (4.186 * 997 * BOILER1_VOLUME)  # time slots are converted to seconds.
         Bb2 = (TIME_SLOT * 60) / (4.186 * 997 * BOILER2_VOLUME)  # time slots are converted to seconds.
 
         # variables are Epsilon, Pg, Pb1, Pb2, Tb1, Tb2, Pbat, Ebat for each time slot
-        row = [0] * no_ctrl_vars
-        row[x * NO_CTRL_VARS_PS + 4] = 1
-        row[x * NO_CTRL_VARS_PS + 2] = Bb1
-
         if x == 0:
-            # print (row)
+            row = [0] * no_ctrl_vars
+            row[x * NO_CTRL_VARS_PS + 4] = 1
+            row[x * NO_CTRL_VARS_PS + 2] = Bb1
             A_eq.append(row)
-            b_eq.append(Ab1 * T_B1_init + Cb1 * T_B2_init)
+            b_eq.append(Ab1 * T_B1_init + Cb1 * BOILER1_TEMP_INCOMING_WATER)
 
             row = [0] * no_ctrl_vars
             row[x * NO_CTRL_VARS_PS + 5] = 1
             row[x * NO_CTRL_VARS_PS + 3] = Bb2
-            # print (row)
             A_eq.append(row)
-            # print (A_ub)
-            b_eq.append(Ab2 * T_B2_init + Db2)
+            b_eq.append(Ab2 * T_B2_init + Cb2 * BOILER2_TEMP_INCOMING_WATER)
         else:  # variables are Epsilon, Pg, Pb1, Pb2, Tb1, Tb2, Pbat, Ebat
+            row = [0] * no_ctrl_vars
+            row[x * NO_CTRL_VARS_PS + 4] = 1
+            row[x * NO_CTRL_VARS_PS + 2] = Bb1
             row[x * NO_CTRL_VARS_PS - 4] = -Ab1
-            row[x * NO_CTRL_VARS_PS - 3] = -Cb1
             A_eq.append(row)
-            b_eq.append(0)
+            b_eq.append(Cb1 * BOILER1_TEMP_INCOMING_WATER)
 
             row = [0] * no_ctrl_vars
             row[x * NO_CTRL_VARS_PS + 5] = 1
             row[x * NO_CTRL_VARS_PS + 3] = Bb2
             row[x * NO_CTRL_VARS_PS - 3] = -Ab2
             A_eq.append(row)
-            b_eq.append(Db2)
+            b_eq.append(Cb2 * BOILER2_TEMP_INCOMING_WATER)
 
         # 4. Setup inequality constraints
-        sell_index = energy_sell_price_df.index[energy_sell_price_df.index == current_time][
-            0]  # dataframe.index returns a list
-        buy_index = energy_buy_price_df.index[energy_buy_price_df.index == current_time][0]  # df.index returns a list
-        current_sell_price = energy_sell_price_df.loc[sell_index]  # per unit energy price
-        current_buy_price = energy_buy_price_df.loc[buy_index]  # per unit (kWh) energy price
-        # print (current_buy_price[0])
-        # print (current_sell_price[0])
+        sell_index = energy_sell_price_df.index[energy_sell_price_df.index == current_time][0] # dataframe.index returns a list
+        buy_index = energy_buy_price_df.index[energy_buy_price_df.index == current_time][0] # df.index returns a list
+        current_sell_price = energy_sell_price_df.loc[sell_index] # per unit energy price
+        current_buy_price = energy_buy_price_df.loc[buy_index] # per unit (kWh) energy price
         row = [0] * no_ctrl_vars
-        row[x * NO_CTRL_VARS_PS] = -1
-        row[x * NO_CTRL_VARS_PS + 1] = current_buy_price[0] / (6 * 1000)  # converting it to price per watt-10minutes
+        row[x * NO_CTRL_VARS_PS] = 1
+        row[x * NO_CTRL_VARS_PS + 1] = -current_buy_price[0] / ((60/TIME_SLOT) * 1000) # converting it to price per watt-INTERVALminutes
         A_ub.append(row)
         b_ub.append(0)
 
         row = [0] * no_ctrl_vars
-        row[x * NO_CTRL_VARS_PS] = -1
-        row[x * NO_CTRL_VARS_PS + 1] = current_sell_price[0] / (6 * 1000)  # converting it to price per watt-second
+        row[x * NO_CTRL_VARS_PS] = 1
+        row[x * NO_CTRL_VARS_PS + 1] = current_sell_price[0] / ((60/TIME_SLOT) * 1000) # converting it to price per watt-second
         A_ub.append(row)
         b_ub.append(0)
         current_time = current_time + timedelta(minutes=TIME_SLOT)
@@ -287,10 +317,12 @@ def mpc_iteration(T_B1_init, T_B2_init, soc_bat_init, iteration):
 
     # outputs = {1: pb1[0], 2: pb2[0]], 'bat': p_bat}
     x = 0
-    outputs = {1: res.x[2] * 1000, 2: res.x[3] * 1000, 'bat': res.x[6] * 1000}
-
+    print("tb1 =", res.x[4], 'tb2=', res.x[5])
+    print("pg =", res.x[1])
+    print("epsilon =", res.x[0])
+    outputs = {1: res.x[2], 2: res.x[3], 'bat': res.x[6]}
+    print("p1, p2, pbat ", outputs)
     return outputs
-
 
     '''power_pcc = []
     power_boiler1 = []

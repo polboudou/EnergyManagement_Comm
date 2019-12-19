@@ -9,8 +9,9 @@ HORIZON = 1440*60  # in minutes, corresponds to 24 hours
 
 MPC_START_TIME = '05.01.2018 00:00:00'  # pandas format mm.dd.yyyy hh:mm:ss
 SIMU_TIMESTEP = 30
-CONTROL_TIMESTEP = 10*60    # in minutes
+CONTROL_TIMESTEP = 5*60    # in minutes
 
+scenario = 'MPCbattery'
 scenario = 'MPCboilers'
 
 

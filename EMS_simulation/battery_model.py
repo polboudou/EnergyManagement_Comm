@@ -9,7 +9,7 @@ import time
 SIMU_TIMESTEP = 30  # in minutes
 CONTROL_TIMESTEP = 10*60   # in minutes
 HORIZON = 1440*60  # in minutes, corresponds to 24 hours
-#HORIZON = 720  # for testing purposes
+#HORIZON = 720*60  # for testing purposes
 #HORIZON = 60*60  # for testing purposes
 
 SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP))
@@ -49,7 +49,7 @@ class Battery():
         client.on_connect = on_connect
         #client.on_log = on_log
         client.on_disconnect = on_disconnect
-        client.on_message = on_message_boiler
+        client.on_message = on_message_battery
         client.connect(broker_address)
         client.loop_start()  # without the loop, the call back functions dont get processed
         return client
@@ -68,7 +68,7 @@ def on_connect(client, userdata, flags, rc):
 def on_disconnect(client, userdata, flags, rc=0):
     print('battery disconnected')
 
-def on_message_boiler(client, userdata, msg):
+def on_message_battery(client, userdata, msg):
     m_decode = str(msg.payload.decode("utf-8", "ignore"))
     if m_decode == 'End':
         print("this is the end of battery")
