@@ -18,7 +18,7 @@ SIMU_TIMESTEP = 30  # in minutes
 CONTROL_TIMESTEP = 10*60
 HORIZON = 1440*60  # in minutes, corresponds to 24 hours
 #HORIZON = 720*60  # for testing purposes
-#HORIZON = 60*60  # for testing purposes
+HORIZON = 60*60  # for testing purposes
 
 
 BOILER1_TEMP_MIN = 40   # in degree celsius

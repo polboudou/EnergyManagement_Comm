@@ -26,13 +26,17 @@ import numpy as np
 
 
 # define constants
-TIME_SLOT = 10 # in minutes
-#HORIZON = 20 # in minutes, corresponds to 24 hours
-HORIZON = 1440 # in minutes, corresponds to 24 hours
-#HORIZON = 720  # for testing purposes
-#HORIZON = 60  # for testing purposes
+TIME_SLOT = 10  # in minutes
+TIME_SLOT = 5  # in minutes
+# HORIZON = 20 # in minutes, corresponds to 24 hours
+HORIZON = 1440  # in minutes, corresponds to 24 hours
+# HORIZON = 720  # for testing purposes
+HORIZON = 20  # for testing purposes
 
-MPC_START_TIME = '05.01.2018 00:00:00' # pandas format mm.dd.yyyy hh:mm:ss
+no_slots = int(HORIZON / TIME_SLOT)
+no_slots = int(0.5*HORIZON / TIME_SLOT)
+
+MPC_START_TIME = '05.01.2018 00:00:00'  # pandas format mm.dd.yyyy hh:mm:ss
 
 BOILER1_TEMP_MIN = 40  # in degree celsius
 BOILER1_TEMP_MAX = 50  # in degree celsius
@@ -49,14 +53,12 @@ BOILER2_RATED_P = -7600  # in Watts
 BOILER1_VOLUME = 800  # in litres
 BOILER2_VOLUME = 800  # in litres
 
-BATTERY_SOC_MAX = 5000                 # in Watts min
-BATTERY_SOC_MIN = 200                  # in Watts min
+BATTERY_SOC_MAX = 5000                 # in Watts h
+BATTERY_SOC_MIN = 200                  # in Watts h
 BATTERY_CHARGE_POWER_LIMIT = -5000           # in Watts
 BATTERY_DISCHARGE_POWER_LIMIT = 5000       # in Watts
 
 
-
-no_slots = int(HORIZON / TIME_SLOT)
 
 '''
 def get_excess_power_forecast(iteration):
@@ -96,7 +98,7 @@ def get_energy_buy_price():
 
 def get_hot_water_usage_forecast():
 
-	df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
+	df = pd.read_excel('../data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
 	hot_water_usage = df['Hot water usage (litres)'].to_numpy() / (10/TIME_SLOT)  /2# data is in [litres*10min]    # divided by 2 for [litres*5min]
 
 	hot_water_usage = np.repeat(hot_water_usage, int(10/TIME_SLOT))
@@ -105,7 +107,7 @@ def get_hot_water_usage_forecast():
 	return df
 
 def get_excess_power_forecast(iteration):
-	df = pd.read_excel('data_input/Energie - 00003 - Pache.xlsx', index_col=[0], usecols=[0,1])
+	df = pd.read_excel('../data_input/Energie - 00003 - Pache.xlsx', index_col=[0], usecols=[0,1])
 
 	start_index = df.index[df.index == (MPC_START_TIME)][0] # df.index returns a list
 	start_index += timedelta(minutes=iteration*TIME_SLOT)
@@ -119,7 +121,7 @@ def get_excess_power_forecast(iteration):
 	return df
 
 def get_energy_sell_price():
-	df = pd.read_excel('data_input/energy_sell_price_10min_granularity.xlsx', index_col=[0], usecols=[0,1]).to_numpy()
+	df = pd.read_excel('../data_input/energy_sell_price_10min_granularity.xlsx', index_col=[0], usecols=[0,1]).to_numpy()
 	df = np.repeat(df, int(10 / TIME_SLOT))
 	dates = pd.date_range(start=MPC_START_TIME, end='05.05.2018 23:55:00', freq=str(TIME_SLOT) + 'min')
 	df = pd.DataFrame(df, index=dates)
@@ -127,17 +129,14 @@ def get_energy_sell_price():
 
 
 def get_energy_buy_price():
-	df = pd.read_excel('data_input/energy_buy_price_10min_granularity.xlsx', index_col=[0], usecols=[0,1]).to_numpy()
-	#df.plot.line(y='Hot water usage (litres)')
-	#plt.savefig('../../figs_output/hot_water_usage_profile_24hrs.pdf')
-	df = np.repeat(df, int(10 / TIME_SLOT))
-	dates = pd.date_range(start=MPC_START_TIME, end='05.05.2018 23:55:00', freq=str(TIME_SLOT) + 'min')
-	df = pd.DataFrame(df, index=dates)
-	return df
+    df = pd.read_excel('../data_input/energy_buy_price_10min_granularity.xlsx', index_col=[0], usecols=[0, 1]).to_numpy()
+    df = np.repeat(df, int(10 / TIME_SLOT))
+    dates = pd.date_range(start=MPC_START_TIME, end='05.05.2018 23:55:00', freq=str(TIME_SLOT) + 'min')
+    df = pd.DataFrame(df, index=dates)
+    return df
 
 
-def mpc_iteration(T_B1_init, T_B2_init, soc_bat_init, iteration):
-
+def mpc_iteration(p_x, T_B1_init, T_B2_init, soc_bat_init, iteration):
     # Get disturbance forecasts
     # 1. Get excess solar power forecasts
     excess_power_forecast_df = get_excess_power_forecast(iteration)
@@ -166,9 +165,10 @@ def mpc_iteration(T_B1_init, T_B2_init, soc_bat_init, iteration):
     A_ub = []
     b_ub = []
 
+
     for x in range(no_slots):
         # 1. Setup the objective function
-        c.append(-1)  # variables are Epsilon, Pg, Pb1, Pb2, Tb1, Tb2, Pbat, Ebat for each time slot
+        c.append(1)  # variables are Epsilon, Pg, Pb1, Pb2, Tb1, Tb2, Pbat, Ebat for each time slot
         c.extend([0, 0, 0, 0, 0, 0, 0])
         # print (c)
 
@@ -189,24 +189,23 @@ def mpc_iteration(T_B1_init, T_B2_init, soc_bat_init, iteration):
             0]  # df.index returns a list
         excess_power_forecast = excess_power_forecast_df.loc[excess_power_forecast_index]
         if x == 0:
-            print("excess_power_forecast ", -excess_power_forecast)
-        # excess_power_forecast[0] = 1 # for testing purposes
-        # if random.uniform(0,1) <= 0.5:
-        # 	excess_power_forecast[0] = -random.uniform(0,1) * 50000
-        # else:
-        # 	excess_power_forecast[0] = random.uniform(0,1) * 50000
-        # print (excess_power_forecast[0])
-        # power balance constraint
-        row = [0] * no_ctrl_vars
-        row[x * NO_CTRL_VARS_PS + 1] = 1  # variables are Epsilon, Pg, Pb1, Pb2, Tb1, Tb2, Pbat, Ebat for each time slot
-        row[x * NO_CTRL_VARS_PS + 2] = 1
-        row[x * NO_CTRL_VARS_PS + 3] = 1
-        row[x * NO_CTRL_VARS_PS + 6] = 1
-        #print (row)
-        A_eq.append(row)
-        # print (A_eq)
-        b_eq.append(-excess_power_forecast[0])
-        # print (b_eq)
+            # power balance constraint
+            row = [0] * no_ctrl_vars
+            row[x * NO_CTRL_VARS_PS + 1] = 1  # variables are Epsilon, Pg, Pb1, Pb2, Tb1, Tb2, Pbat, Ebat for each time slot
+            row[x * NO_CTRL_VARS_PS + 2] = 1
+            row[x * NO_CTRL_VARS_PS + 3] = 1
+            row[x * NO_CTRL_VARS_PS + 6] = 1
+            A_eq.append(row)
+            b_eq.append(-p_x)   # we use the measurement for t=0, else the forecast.
+        else:
+            row = [0] * no_ctrl_vars
+            row[x * NO_CTRL_VARS_PS + 1] = 1  # variables are Epsilon, Pg, Pb1, Pb2, Tb1, Tb2, Pbat, Ebat for each time slot
+            row[x * NO_CTRL_VARS_PS + 2] = 1
+            row[x * NO_CTRL_VARS_PS + 3] = 1
+            row[x * NO_CTRL_VARS_PS + 6] = 1
+            A_eq.append(row)
+            b_eq.append(-excess_power_forecast[0])
+
 
         #######################     Battery model     ##########################
         row = [0] * no_ctrl_vars
@@ -216,7 +215,7 @@ def mpc_iteration(T_B1_init, T_B2_init, soc_bat_init, iteration):
         if x == 0:
             b_eq.append(soc_bat_init)
         else:
-            row[x * NO_CTRL_VARS_PS -1] = 1
+            row[x * NO_CTRL_VARS_PS -1] = -1
             b_eq.append(0)
         ########################################################################
 
@@ -225,8 +224,7 @@ def mpc_iteration(T_B1_init, T_B2_init, soc_bat_init, iteration):
         hot_water_usage_forecast_df.index[hot_water_usage_forecast_df.index == current_time][
             0]  # df.index returns a list
         hot_water_usage_forecast = hot_water_usage_forecast_df.loc[hot_water_usage_forecast_index]
-        # newV = 0 # for testing purposes
-        # print (hot_water_usage_forecast[0])
+
         newV = hot_water_usage_forecast[0]
         Ab1 = 1 - newV / BOILER1_VOLUME
         Ab2 = 1 - newV / BOILER2_VOLUME
@@ -270,14 +268,15 @@ def mpc_iteration(T_B1_init, T_B2_init, soc_bat_init, iteration):
         buy_index = energy_buy_price_df.index[energy_buy_price_df.index == current_time][0] # df.index returns a list
         current_sell_price = energy_sell_price_df.loc[sell_index] # per unit energy price
         current_buy_price = energy_buy_price_df.loc[buy_index] # per unit (kWh) energy price
+
         row = [0] * no_ctrl_vars
-        row[x * NO_CTRL_VARS_PS] = 1
-        row[x * NO_CTRL_VARS_PS + 1] = -current_buy_price[0] / ((60/TIME_SLOT) * 1000) # converting it to price per watt-INTERVALminutes
+        row[x * NO_CTRL_VARS_PS] = -1
+        row[x * NO_CTRL_VARS_PS + 1] = current_buy_price[0] / ((60/TIME_SLOT) * 1000) # converting it to price per watt-INTERVALminutes
         A_ub.append(row)
         b_ub.append(0)
 
         row = [0] * no_ctrl_vars
-        row[x * NO_CTRL_VARS_PS] = 1
+        row[x * NO_CTRL_VARS_PS] = -1
         row[x * NO_CTRL_VARS_PS + 1] = current_sell_price[0] / ((60/TIME_SLOT) * 1000) # converting it to price per watt-second
         A_ub.append(row)
         b_ub.append(0)
@@ -285,16 +284,6 @@ def mpc_iteration(T_B1_init, T_B2_init, soc_bat_init, iteration):
         indices.append(current_time)
 
 
-    # if x == 1:
-    # 	print ("c is")
-    # 	print (c)
-    # 	print ("bounds are")
-    # 	print (bounds)
-    # 	print ("A_eq is")
-    # 	print (A_eq)
-    # 	print ("b_eq is")
-    # 	print (b_eq)
-    # 	exit()
     bounds = tuple(bounds)
 
     '''print ("c is")
@@ -324,49 +313,7 @@ def mpc_iteration(T_B1_init, T_B2_init, soc_bat_init, iteration):
     print("p1, p2, pbat ", outputs)
     return outputs
 
-    '''power_pcc = []
-    power_boiler1 = []
-    power_boiler2 = []
-    temp_boiler1 = []
-    temp_boiler2 = []
-    power_battery = []
-    soc_battery = []
 
-    # for the first time slot, the temperature values are the intial ones
-    temp_boiler1.append(BOILER1_INITIAL_TEMP)
-    temp_boiler2.append(BOILER2_INITIAL_TEMP)
-    soc_battery.append(BATTERY_INITIAL_SOC / (60*1000)) #converting (Watts min) to kWh)
-
-    for x in range(no_slots):
-        power_pcc.append(-res.x[x * NO_CTRL_VARS_PS + 1])
-        power_boiler1.append(-res.x[x * NO_CTRL_VARS_PS + 2])
-        power_boiler2.append(-res.x[x * NO_CTRL_VARS_PS + 3])
-        temp_boiler1.append(res.x[x * NO_CTRL_VARS_PS + 4])
-        temp_boiler2.append(res.x[x * NO_CTRL_VARS_PS + 5])
-        power_battery.append(-res.x[x * NO_CTRL_VARS_PS + 6])
-        soc_battery.append(res.x[x * NO_CTRL_VARS_PS + 7] / (60*1000)) #converting (Watts min) to kWh
-
-    # for the last time slot, we do not have these values
-    power_pcc.append(None)
-    power_boiler1.append(None)
-    power_boiler2.append(None)
-    power_battery.append(None)
-
-
-    results = {'power_pcc (Watts) (+ import)': power_pcc, 'power_boiler1 (Watts)': power_boiler1,
-               'power_boiler2 (Watts)': power_boiler2, 'power_battery (Watts)': power_battery, 'temp_boiler1 (°C)': temp_boiler1,
-               'temp_boiler2 (°C)': temp_boiler2}
-    results_df = pd.DataFrame(data=results, index=indices)
-    soc_result_df = pd.DataFrame(data=soc_battery, index=indices, columns =['soc_battery (kWh)'])
-
-    fig, axes = plt.subplots(2, 1)
-    axes[0].set_xlabel('Time [hours]', size=16)
-    axes[0].set_ylabel('Power [W]', size=16)
-    #axes.tick_params(axis='y', labelsize=16)
-    results_df.plot.line(secondary_y=['temp_boiler1 (°C)', 'temp_boiler2 (°C)'], ax=axes[0], figsize=(10,15))
-    soc_result_df.plot.line(ax=axes[1])
-    energy_buy_price_df.plot.line(ax=axes[1], secondary_y=True)
-    plt.savefig('data_output/figs_mpc_battery/results_mpc_battery.pdf')'''
 
 
 

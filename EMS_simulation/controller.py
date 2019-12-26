@@ -6,7 +6,7 @@ import numpy as np
 from scipy import interpolate
 import random
 import matplotlib.pyplot as plt
-import paho.mqtt.client as mqtt # import the client
+import paho.mqtt.client as mqtt
 import time
 from datetime import timedelta
 from EMS_simulation.control_algorithms import scenarios
@@ -14,18 +14,21 @@ from EMS_simulation.control_algorithms import mpc_boilers
 from EMS_simulation.control_algorithms import mpc_batteries
 
 broker_address ="mqtt.teserakt.io"   # use external broker (alternative broker address: "test.mosquitto.org")
+#broker_address ="test.mosquitto.org"   # use external broker (alternative broker address: "mqtt.teserakt.io")
+broker_address = 'mqtt.eclipse.org'
 
 
 HORIZON = 1440*60  # in seconds, corresponds to 24 hours
 #HORIZON = 720*60  # for testing purposes
-#HORIZON = 60*60  # for testing purposes
+HORIZON = 20*60  # for testing purposes
 MPC_START_TIME = '05.01.2018 00:00:00'  # pandas format mm.dd.yyyy hh:mm:ss
 SIMU_TIMESTEP = 30
 CONTROL_TIMESTEP = 10*60    # in minutes
+CONTROL_TIMESTEP = 5*60    # in minutes
 
 # choose between 'Scenario0' to 'Scenario3'
 scenario = 'MPCbattery'
-#scenario = 'MPCboilers'
+scenario = 'MPCboilers'
 
 BOILER1_TEMP_MIN = 40  # in degree celsius
 BOILER1_TEMP_MAX = 50  # in degree celsius
@@ -49,7 +52,7 @@ CONTROL_STEPS = range(0, int(HORIZON/SIMU_TIMESTEP), int(CONTROL_TIMESTEP/SIMU_T
 
 SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP))
 
-FORECAST_INACCURACY_COEF = 1  # 0 for perfect accuracy, 10 for big inaccuracy
+FORECAST_INACCURACY_COEF = 0.5  # 0 for perfect accuracy, 10 for big inaccuracy
 
 class Controller():
     def __init__(self, description):
@@ -78,7 +81,7 @@ class Controller():
 
         if 'MPCboilers' in self.description:
             start = time.time()
-            output = mpc_boilers.mpc_iteration(self.Tb1, self.Tb2, self.control_iter)
+            output = mpc_boilers.mpc_iteration(p_x, self.Tb1, self.Tb2, self.control_iter)
             print("---------MPC computing time =", time.time()-start)
             print("outputs mpc:", output)
             self.control_iter += 1
@@ -87,7 +90,7 @@ class Controller():
         if 'MPCbattery' in self.description:
             print("battery soc ", self.soc_bat)
             start = time.time()
-            output = mpc_batteries.mpc_iteration(self.Tb1, self.Tb2, self.soc_bat, self.control_iter)
+            output = mpc_batteries.mpc_iteration(p_x, self.Tb1, self.Tb2, self.soc_bat, self.control_iter)
             print("---------MPC computing time =", time.time()-start)
             print("outputs mpc:", output)
             self.control_iter += 1
@@ -124,7 +127,7 @@ class Controller():
     def setup_client(self):
         client = mqtt.Client(self.description)
         client.on_connect = on_connect
-        #client.on_log = on_log
+        client.on_log = on_log
         client.on_disconnect = on_disconnect
         client.on_message = on_message_controller
         client.connect(broker_address)
@@ -173,7 +176,7 @@ def get_energy_sell_price():
 def get_energy_buy_price():
     df = pd.read_excel('data_input/energy_buy_price_10min_granularity.xlsx', index_col=[0], usecols=[0, 1])
     buy_price = df['Buy Price (CHF / kWh)'].to_numpy()
-    buy_price = new_resolution(buy_price, SIMU_TIMESTEP, len(sell_price)*10/(60*24))
+    buy_price = new_resolution(buy_price, SIMU_TIMESTEP, len(buy_price)*10/(60*24))
     return buy_price
 
 # callback functions for communication
@@ -250,8 +253,6 @@ if __name__ == '__main__':
         while controller.soc_bat == 0:
             time.sleep(0.01)
 
-    print("entramos")
-
     for h in CONTROL_STEPS:
     #for h in range(2):
         #time.sleep(0.1)
@@ -267,13 +268,12 @@ if __name__ == '__main__':
         if scenario == 'Scenario3' or scenario == 'MPCbattery':
             controller.client.publish('batteryMS', str(actions['bat']))
 
-    time.sleep(1)
-    controller.client.publish('boilers', 'End')
-    controller.client.loop_stop()
-    controller.client.disconnect(broker_address)
+    controller.pb1_list.pop(0)
+    controller.pb2_list.pop(0)
+    controller.Tb1_list.pop(0)
+    controller.Tb2_list.pop(0)
 
     # computing cost
-    #TODO: pop the first value of state lists
     print("pb1_list = ", controller.pb1_list)
     print("pb2_list = ", controller.pb2_list)
     print("Tb1_list = ", controller.Tb1_list)
@@ -329,26 +329,12 @@ if __name__ == '__main__':
         if p_grid_silutation <= 0:
             cost += p_grid_silutation * buy_price[h]
 
-    '''real_cost = 0
-    for h in SIMU_STEPS:
-        p_grid = (p_x[CONTROL_TIMESTEP*int(h/CONTROL_TIMESTEP)] + controller.pb1_list[h] + controller.pb2_list[h]) * (SIMU_TIMESTEP / 60) * 0.001
-        if scenario == 'Scenario3' or scenario == 'MPCbattery':
-            p_grid_silutation += controller.p_bat_list[h] * (SIMU_TIMESTEP/60) * 0.001 # convert Watt to kWh        if p_grid > 0:
-
-        if p_grid_silutation > 0:
-            real_cost += p_grid * sell_price[h]
-        if p_grid <= 0:
-            real_cost += p_grid * buy_price[h]'''
-
-
+    print("hello")
     print("Electricity cost of the simulated ", HORIZON / 60, " hours is ", cost)
     #print("Cost assuming that p_x has no disturbance and remains the same between two control steps: ", real_cost)
 
     result = "Electricity cost of the simulated " + str(HORIZON / 60) + " hours is" + str(cost) + 'CHF'
 
-    controller.client.publish('boilers', 'End')
-    controller.client.loop_stop()
-    controller.client.disconnect(broker_address)
 
 
     ############################       PLOTTING FOR SCENARIO 1     ###########################
@@ -371,6 +357,10 @@ if __name__ == '__main__':
     plt.savefig('simu_output/boilers_evolution_'+scenario+'.pdf')
     ###########################################################################################
 
+    time.sleep(1)
+    controller.client.publish('boilers', 'End')
+    controller.client.loop_stop()
+    controller.client.disconnect(broker_address)
 
     fig, ax = plt.subplots(1, 1)
     ax.plot(range(len(p_x)), p_x, label ='p_x', color='blue')

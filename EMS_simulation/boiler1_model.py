@@ -10,9 +10,10 @@ import time
 
 SIMU_TIMESTEP = 30  # in minutes
 CONTROL_TIMESTEP = 10*60   # in minutes
+CONTROL_TIMESTEP = 5*60   # in minutes
 HORIZON = 1440*60  # in minutes, corresponds to 24 hours
 #HORIZON = 720*60  # for testing purposes
-#HORIZON = 60*60  # for testing purposes
+HORIZON = 20*60  # for testing purposes
 
 SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP))
 
@@ -27,6 +28,8 @@ BOILER1_INITIAL_TEMP = 42  # in degree celsius
 C_BOILER1 =  1 / (4.186 * 997 * BOILER1_VOLUME)    # in [C/(Watt*sec)]
 
 broker_address ="mqtt.teserakt.io"   # use external broker (alternative broker address: "test.mosquitto.org")
+#broker_address ="test.mosquitto.org"   # use external broker (alternative broker address: "mqtt.teserakt.io")
+broker_address = 'mqtt.eclipse.org'
 
 class Boiler():
     def __init__(self, description, simu_timestep, max_power, min_temp, max_temp, current_temp):
@@ -58,7 +61,7 @@ class Boiler():
     def setup_client(self):
         client = mqtt.Client(self.description)
         client.on_connect = on_connect
-        #client.on_log = on_log
+        client.on_log = on_log
         client.on_disconnect = on_disconnect
         client.on_message = on_message_boiler
         client.connect(broker_address)
@@ -134,5 +137,6 @@ if __name__ == '__main__':
         boiler1.model()
         boiler1.control_received = False
 
+    time.sleep(5)
     boiler1.client.loop_stop()
     boiler1.client.disconnect(broker_address)

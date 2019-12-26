@@ -8,9 +8,10 @@ import time
 
 SIMU_TIMESTEP = 30  # in minutes
 CONTROL_TIMESTEP = 10*60   # in minutes
+CONTROL_TIMESTEP = 5*60   # in minutes
 HORIZON = 1440*60  # in minutes, corresponds to 24 hours
 #HORIZON = 720*60  # for testing purposes
-#HORIZON = 60*60  # for testing purposes
+HORIZON = 20*60  # for testing purposes
 
 SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP))
 
@@ -20,7 +21,11 @@ SOC_MIN = 200           # Min State-of-Charge battery (Wh)
 PMAX_CH = -5000            # Max battery charging power (W)
 PMAX_DISCH = 5000          # Max battery discharging power (W)
 
+broker_address = 'mqtt.eclipse.org'
 broker_address ="mqtt.teserakt.io"   # use external broker (alternative broker address: "test.mosquitto.org")
+#broker_address ="test.mosquitto.org"   # use external broker (alternative broker address: "mqtt.teserakt.io")
+broker_address = 'mqtt.eclipse.org'
+
 
 class Battery():
     def __init__(self, description, time_slot, max_charge_power, max_discharge_power, min_soc, max_soc, current_soc):
