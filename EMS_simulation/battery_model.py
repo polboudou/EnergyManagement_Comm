@@ -11,7 +11,7 @@ CONTROL_TIMESTEP = 10*60   # in minutes
 CONTROL_TIMESTEP = 5*60   # in minutes
 HORIZON = 1440*60  # in minutes, corresponds to 24 hours
 #HORIZON = 720*60  # for testing purposes
-HORIZON = 20*60  # for testing purposes
+#HORIZON = 20*60  # for testing purposes
 
 SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP))
 
@@ -21,10 +21,9 @@ SOC_MIN = 200           # Min State-of-Charge battery (Wh)
 PMAX_CH = -5000            # Max battery charging power (W)
 PMAX_DISCH = 5000          # Max battery discharging power (W)
 
-broker_address = 'mqtt.eclipse.org'
 broker_address ="mqtt.teserakt.io"   # use external broker (alternative broker address: "test.mosquitto.org")
 #broker_address ="test.mosquitto.org"   # use external broker (alternative broker address: "mqtt.teserakt.io")
-broker_address = 'mqtt.eclipse.org'
+#broker_address = 'mqtt.eclipse.org'
 
 
 class Battery():
@@ -94,12 +93,13 @@ if __name__ == '__main__':
     cname = "Battery_" + str(r)     # broker doesn't like when two clients with same name connect
     battery = Battery(cname, SIMU_TIMESTEP, PMAX_CH, PMAX_DISCH, SOC_MIN, SOC_MAX, current_soc=SOC_MIN)
     battery.client.subscribe('batteryMS')
+    time.sleep(2)
+
     battery.client.publish('battery/power', battery.current_power)
     battery.client.publish('battery/soc', battery.current_soc)
 
     for t in SIMU_STEPS:
         if not (battery.time_step % CONTROL_TIMESTEP):
-            #print("Battery period ", t, "min")
             while not battery.control_received:
                 time.sleep(0.001)
         battery.client.publish('battery/soc', battery.current_soc)

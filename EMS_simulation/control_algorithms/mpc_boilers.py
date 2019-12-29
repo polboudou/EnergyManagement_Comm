@@ -1,11 +1,8 @@
 #!/usr/bin/env python3
 import pandas as pd
-import matplotlib.pyplot as plt
 from datetime import timedelta
 from datetime import datetime
 from scipy.optimize import linprog
-import random
-from scipy import interpolate
 import numpy as np
 
 # import scipy as scipy

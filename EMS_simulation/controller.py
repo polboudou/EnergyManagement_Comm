@@ -15,12 +15,14 @@ from EMS_simulation.control_algorithms import mpc_batteries
 
 broker_address ="mqtt.teserakt.io"   # use external broker (alternative broker address: "test.mosquitto.org")
 #broker_address ="test.mosquitto.org"   # use external broker (alternative broker address: "mqtt.teserakt.io")
-broker_address = 'mqtt.eclipse.org'
+#broker_address = 'mqtt.eclipse.org'
+#broker_address="broker.hivemq.com"
+
 
 
 HORIZON = 1440*60  # in seconds, corresponds to 24 hours
 #HORIZON = 720*60  # for testing purposes
-HORIZON = 20*60  # for testing purposes
+#HORIZON = 20*60  # for testing purposes
 MPC_START_TIME = '05.01.2018 00:00:00'  # pandas format mm.dd.yyyy hh:mm:ss
 SIMU_TIMESTEP = 30
 CONTROL_TIMESTEP = 10*60    # in minutes
@@ -29,6 +31,7 @@ CONTROL_TIMESTEP = 5*60    # in minutes
 # choose between 'Scenario0' to 'Scenario3'
 scenario = 'MPCbattery'
 scenario = 'MPCboilers'
+#scenario = 'Scenario2'
 
 BOILER1_TEMP_MIN = 40  # in degree celsius
 BOILER1_TEMP_MAX = 50  # in degree celsius
@@ -52,7 +55,7 @@ CONTROL_STEPS = range(0, int(HORIZON/SIMU_TIMESTEP), int(CONTROL_TIMESTEP/SIMU_T
 
 SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP))
 
-FORECAST_INACCURACY_COEF = 0.5  # 0 for perfect accuracy, 10 for big inaccuracy
+FORECAST_INACCURACY_COEF = 0.1  # 0 for perfect accuracy, 1 for big inaccuracy
 
 class Controller():
     def __init__(self, description):
@@ -79,6 +82,30 @@ class Controller():
 
     def run_algorithm(self, p_x):
 
+        if 'Scenario0' in self.description:
+            output = scenarios.algo_scenario0({1: [self.Tb1, self.pb1, self.sb1], 2: [self.Tb2, self.pb2, self.sb2]})
+            self.sb1 = output['hyst_states'][1]
+            self.sb1_list.append(self.sb1)
+            self.sb2 = output['hyst_states'][2]
+            self.sb2_list.append(self.sb2)
+            return output['actions']
+
+        if 'Scenario1' in self.description:
+            output = scenarios.algo_scenario1({1: [self.Tb1, self.pb1, self.sb1], 2: [self.Tb2, self.pb2, self.sb2]}, p_x)
+            self.sb1 = output['hyst_states'][1]
+            self.sb1_list.append(self.sb1)
+            self.sb2 = output['hyst_states'][2]
+            self.sb2_list.append(self.sb2)
+            return output['actions']
+
+        if 'Scenario2' in self.description:
+            output = scenarios.algo_scenario2({1: [self.Tb1, self.pb1, self.sb1], 2: [self.Tb2, self.pb2, self.sb2]}, p_x, [self.soc_bat, self.p_bat] )
+            self.sb1 = output['hyst_states'][1]
+            self.sb1_list.append(self.sb1)
+            self.sb2 = output['hyst_states'][2]
+            self.sb2_list.append(self.sb2)
+            return output['actions']
+
         if 'MPCboilers' in self.description:
             start = time.time()
             output = mpc_boilers.mpc_iteration(p_x, self.Tb1, self.Tb2, self.control_iter)
@@ -96,38 +123,14 @@ class Controller():
             self.control_iter += 1
             return output
 
-        if 'Scenario1' in self.description:
-            target_power = scenarios.algo_scenario1({1: [self.Tb1, self.pb1], 2: [self.Tb2, self.pb2]}, p_x)
-            return target_power
-
-        if 'Scenario2' in self.description:
-            output = scenarios.algo_scenario2({1: [self.Tb1, self.pb1, self.sb1], 2: [self.Tb2, self.pb2, self.sb2]}, p_x)
-            self.sb1 = output['hyst_states'][1]
-            self.sb1_list.append(self.sb1)
-            self.sb2 = output['hyst_states'][2]
-            self.sb2_list.append(self.sb2)
-            return output['actions']
-
-        if 'Scenario0' in self.description:
-            output = scenarios.algo_scenario0({1: [self.Tb1, self.pb1, self.sb1], 2: [self.Tb2, self.pb2, self.sb2]})
-            self.sb1 = output['hyst_states'][1]
-            self.sb1_list.append(self.sb1)
-            self.sb2 = output['hyst_states'][2]
-            self.sb2_list.append(self.sb2)
-            return output['actions']
-
-        if 'Scenario3' in self.description:
-            output = scenarios.algo_scenario3({1: [self.Tb1, self.pb1, self.sb1], 2: [self.Tb2, self.pb2, self.sb2]}, p_x, [self.soc_bat, self.p_bat] )
-            self.sb1 = output['hyst_states'][1]
-            self.sb1_list.append(self.sb1)
-            self.sb2 = output['hyst_states'][2]
-            self.sb2_list.append(self.sb2)
-            return output['actions']
+        #if 'Scenario1' in self.description:
+        #    target_power = scenarios.algo_scenario1({1: [self.Tb1, self.pb1], 2: [self.Tb2, self.pb2]}, p_x)
+        #    return target_power
 
     def setup_client(self):
         client = mqtt.Client(self.description)
         client.on_connect = on_connect
-        client.on_log = on_log
+        #client.on_log = on_log
         client.on_disconnect = on_disconnect
         client.on_message = on_message_controller
         client.connect(broker_address)
@@ -158,15 +161,28 @@ def get_excess_power_forecast():
 
     return excess
 
-
 def get_excess_power_simulation(p_x_forecast):
+    # random samples from a uniform distribution around 0
+    random.seed(1)
+    p_x_forecast = np.array(p_x_forecast)
+
+    p_x = [0]*len(p_x_forecast)
+    for i in range(len(p_x_forecast)):
+        if p_x_forecast[i] > 0:
+            p_x[i] = p_x_forecast[i] + random.uniform(-FORECAST_INACCURACY_COEF*p_x_forecast[i], FORECAST_INACCURACY_COEF*p_x_forecast[i])
+        else:
+            p_x[i] = p_x_forecast[i] - random.uniform(0, FORECAST_INACCURACY_COEF*p_x_forecast[i])
+
+    return p_x
+
+'''def get_excess_power_simulation(p_x_forecast):
     # random samples from a uniform distribution around 0
     p_x_forecast = np.array(p_x_forecast)
     mean_px = np.nanmean(np.array(p_x_forecast))
     np.random.seed(1)
     p_x = p_x_forecast + FORECAST_INACCURACY_COEF*mean_px*np.random.normal(size=len(p_x_forecast))
     return(p_x)
-
+'''
 def get_energy_sell_price():
     df = pd.read_excel('data_input/energy_sell_price_10min_granularity.xlsx', index_col=[0], usecols=[0, 1])
     sell_price = df['Sell Price (CHF / kWh)'].to_numpy()
@@ -231,13 +247,13 @@ if __name__ == '__main__':
 
     print('Instantiating controller!')
     r = random.randrange(1, 100000)
-    cname = scenario + "_" + str(r)     # broker doesn't like when two clients with same name connect
+    cname = scenario + "-" + str(r)     # broker doesn't like when two clients with same name connect
     controller = Controller(cname)
     controller.client.subscribe("boiler2_sensor/temp")
     controller.client.subscribe("boiler2_sensor/power")
     controller.client.subscribe("boiler1_sensor/temp")
     controller.client.subscribe("boiler1_sensor/power")
-    if scenario == 'Scenario3' or scenario == 'MPCbattery':
+    if scenario == 'Scenario2' or scenario == 'MPCbattery':
         controller.client.subscribe("battery/soc")
         controller.client.subscribe("battery/power")
 
@@ -249,48 +265,48 @@ if __name__ == '__main__':
     # wait until receives first measurements of b1, b2
     while controller.Tb1 == 0 or controller.Tb2 == 0:
         time.sleep(0.01)
-    if scenario == 'Scenario3' or scenario == 'MPCbattery':
+    if scenario == 'Scenario2' or scenario == 'MPCbattery':
         while controller.soc_bat == 0:
             time.sleep(0.01)
+
+    print('algo')
 
     for h in CONTROL_STEPS:
     #for h in range(2):
         #time.sleep(0.1)
         #controller.client.publish(' boilers', 'Request measurement')
         print("controller period at", h, 'min')
-        time.sleep(0.05*(CONTROL_TIMESTEP/SIMU_TIMESTEP))
-        print("len(controller.pb1), len(controller.Tb2) ", len(controller.pb1_list), len(controller.Tb2_list))
-        actions = controller.run_algorithm(p_x[h])
+        time.sleep(0.1*(CONTROL_TIMESTEP/SIMU_TIMESTEP))
+        if scenario == 'Scenario2' or scenario == 'MPCbattery':
+            print("len(controller.pb1), len(controller.Tb2), len(controller.p_bat_list) ", len(controller.pb1_list), len(controller.Tb2_list), len(controller.p_bat_list))
+        else:
+            print("len(controller.pb1), len(controller.Tb2) ", len(controller.pb1_list), len(controller.Tb2_list))
+
+        actions = controller.run_algorithm(p_x_measured[h])
         print('actions ', actions)
 
         controller.client.publish('boiler1_actuator', str(actions[1]))
         controller.client.publish('boiler2_actuator', str(actions[2]))
-        if scenario == 'Scenario3' or scenario == 'MPCbattery':
+        if scenario == 'Scenario2' or scenario == 'MPCbattery':
             controller.client.publish('batteryMS', str(actions['bat']))
 
     controller.pb1_list.pop(0)
     controller.pb2_list.pop(0)
     controller.Tb1_list.pop(0)
     controller.Tb2_list.pop(0)
+    if scenario == 'Scenario2' or scenario == 'MPCbattery':
+        controller.p_bat_list.pop(0)
+        controller.soc_bat_list.pop(0)
 
     # computing cost
     print("pb1_list = ", controller.pb1_list)
     print("pb2_list = ", controller.pb2_list)
     print("Tb1_list = ", controller.Tb1_list)
     print("Tb2_list = ", controller.Tb2_list)
-    print("sb1_list = ", controller.sb1_list)
-    print("sb2_list = ", controller.sb2_list)
     print("soc_bat_list = ", controller.soc_bat_list)
     print("p_bat_list = ", controller.p_bat_list)
-    print("p_x = ", p_x.tolist())
-
-    print("len(pb1_list = ", len(controller.pb1_list))
-    print("len(pb2_list = ", len(controller.pb2_list))
-    print("len(Tb1_list = ", len(controller.Tb1_list))
-    print("len(Tb2_list = ", len(controller.Tb2_list))
-    print("len(p_bat_list = ", len(controller.p_bat_list))
-    print("len(soc_bat_list = ", len(controller.soc_bat_list))
-    print("len(p_x) = ", len(p_x))
+    print("p_x_forecast = ", p_x.tolist())
+    print("p_x_measured = ", p_x_measured)
 
     fig, ax = plt.subplots(1, 1)
     ax.plot(range(len(controller.pb1_list)), controller.pb1_list, label='Power B1', color='blue', linestyle='-.')
@@ -320,8 +336,8 @@ if __name__ == '__main__':
 
     cost = 0
     for h in SIMU_STEPS:
-        p_grid_silutation = (p_x[h] + controller.pb1_list[h] + controller.pb2_list[h]) / (3600/SIMU_TIMESTEP) * 0.001 # convert Watt to kWh
-        if scenario == 'Scenario3' or scenario == 'MPCbattery':
+        p_grid_silutation = (p_x_measured[h] + controller.pb1_list[h] + controller.pb2_list[h]) / (3600/SIMU_TIMESTEP) * 0.001 # convert Watt to kWh
+        if scenario == 'Scenario2' or scenario == 'MPCbattery':
             p_grid_silutation += controller.p_bat_list[h] / (3600/SIMU_TIMESTEP) * 0.001 # convert Watt to kWh
 
         if p_grid_silutation > 0:
@@ -329,7 +345,6 @@ if __name__ == '__main__':
         if p_grid_silutation <= 0:
             cost += p_grid_silutation * buy_price[h]
 
-    print("hello")
     print("Electricity cost of the simulated ", HORIZON / 60, " hours is ", cost)
     #print("Cost assuming that p_x has no disturbance and remains the same between two control steps: ", real_cost)
 
@@ -395,3 +410,4 @@ if __name__ == '__main__':
     axes[1].legend()
     plt.savefig('simu_output/boilers_evolution_'+scenario+'.pdf')
     ###########################################################################################'''
+

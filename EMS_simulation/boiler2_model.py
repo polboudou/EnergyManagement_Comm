@@ -13,7 +13,7 @@ CONTROL_TIMESTEP = 10*60                # in minutes
 CONTROL_TIMESTEP = 5*60   # in minutes
 HORIZON = 1440*60                  # in minutes, corresponds to 24 hours
 #HORIZON = 720*60  # for testing purposes
-HORIZON = 20*60  # for testing purposes
+#HORIZON = 20*60  # for testing purposes
 
 SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP))
 
@@ -29,7 +29,8 @@ C_BOILER = 1 / (4.186 * 997 * BOILER2_VOLUME)     # in [C/(Watt*sec)]
 
 broker_address ="mqtt.teserakt.io"   # use external broker (alternative broker address: "test.mosquitto.org")
 #broker_address ="test.mosquitto.org"   # use external broker (alternative broker address: "mqtt.teserakt.io")
-broker_address = 'mqtt.eclipse.org'
+#broker_address = 'mqtt.eclipse.org'
+#broker_address="broker.hivemq.com"
 
 class Boiler():
     def __init__(self, description, simu_timestep, max_power, min_temp, max_temp, current_temp):
@@ -64,7 +65,7 @@ class Boiler():
     def setup_client(self):
         client = mqtt.Client(self.description)
         client.on_connect = on_connect
-        client.on_log = on_log         # remove comment if curious about communication logs.
+        #client.on_log = on_log         # remove comment if curious about communication logs.
         client.on_disconnect = on_disconnect
         client.on_message = on_message_boiler
         client.connect(broker_address)
@@ -120,7 +121,7 @@ if __name__ == '__main__':
     time.sleep(2)
     print('Instantiating boiler 2 entity!')
     r = random.randrange(1, 100000)
-    cname = "Boiler2_" + str(r)     # broker doesn't like when two clients with same name connect
+    cname = "Boiler2-" + str(r)     # broker doesn't like when two clients with same name connect
     boiler2 = Boiler(cname, SIMU_TIMESTEP, BOILER2_RATED_P, BOILER2_TEMP_MIN, BOILER2_TEMP_MAX, BOILER2_INITIAL_TEMP)
     boiler2.client.subscribe('boiler2_actuator')
     boiler2.client.publish('boiler2_sensor/power', boiler2.power)

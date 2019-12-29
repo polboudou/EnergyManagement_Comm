@@ -23,11 +23,11 @@ HORIZON = 60*60  # for testing purposes
 
 BOILER1_TEMP_MIN = 40   # in degree celsius
 BOILER1_TEMP_MAX = 50   # in degree celsius
-BOILER1_TEMP_DELTA = 42 # in degree celsius
+BOILER1_TEMP_DELTA = 40.2 # in degree celsius
 
 BOILER2_TEMP_MIN = 30   # in degree celsius
 BOILER2_TEMP_MAX = 60   # in degree celsius
-BOILER2_TEMP_DELTA = 36 # in degree celsius
+BOILER2_TEMP_DELTA = 30.6 # in degree celsius
 
 
 BOILERS_TEMP_MAX={1: BOILER1_TEMP_MAX, 2: BOILER2_TEMP_MAX}
@@ -82,26 +82,9 @@ def algo_scenario0(boiler_states):
     return outputs
 
 
-def algo_scenario1(boiler_states, p_x):
-
-    u_B = {1: 0, 2: 0}
-    #p_x = p_x + boiler_states[1][POWER] + boiler_states[2][POWER]
-    boiler_states_sorted = sorted(boiler_states.items(), key=operator.itemgetter(1))
-    for (boiler, state) in boiler_states_sorted:
-
-        if state[TEMP] <= BOILERS_TEMP_MIN[boiler]:
-            u_B[boiler] = BOILERS_RATED_P[boiler]
-            p_x += u_B[boiler]
-        else:
-            if p_x > 0:
-                error_Temp = max(0, BOILERS_TEMP_MAX[boiler] - state[TEMP])
-                u_B[boiler] = max(- error_Temp / C_BOILER, BOILERS_RATED_P[boiler], -p_x)
-                p_x += u_B[boiler]
-
-    return u_B
 
 # Control algorithm
-def algo_scenario2(boiler_states, p_x):
+def algo_scenario1(boiler_states, p_x):
 
 
     u_B = {1: 0, 2: 0}
@@ -137,16 +120,30 @@ def algo_scenario2(boiler_states, p_x):
     outputs = {'actions': u_B, 'hyst_states': hyst_states}
     return outputs
 
+'''def algo_scenario1_old(boiler_states, p_x):
+
+    u_B = {1: 0, 2: 0}
+    #p_x = p_x + boiler_states[1][POWER] + boiler_states[2][POWER]
+    boiler_states_sorted = sorted(boiler_states.items(), key=operator.itemgetter(1))
+    for (boiler, state) in boiler_states_sorted:
+
+        if state[TEMP] <= BOILERS_TEMP_MIN[boiler]:
+            u_B[boiler] = BOILERS_RATED_P[boiler]
+            p_x += u_B[boiler]
+        else:
+            if p_x > 0:
+                error_Temp = max(0, BOILERS_TEMP_MAX[boiler] - state[TEMP])
+                u_B[boiler] = max(- error_Temp / C_BOILER, BOILERS_RATED_P[boiler], -p_x)
+                p_x += u_B[boiler]
+
+    return u_B'''
 
 # Control algorithm
-def algo_scenario3(boiler_states, p_x, battery_state):
+def algo_scenario2(boiler_states, p_x, battery_state):
 
-    #u = {1: boiler_states[1][POWER], 2: boiler_states[2][POWER], 'bat': 0}
-    #if p_x <= 0:
     u = {1: 0, 2: 0, 'bat': 0}
 
     hyst_states = {1: 0, 2: 0}
-    #p_x = p_x + boiler_states[1][POWER] + boiler_states[2][POWER] + battery_state[POWER]
     boiler_states_sorted = sorted(boiler_states.items(), key=operator.itemgetter(1))
     for (boiler, state) in boiler_states_sorted:
         # setting hysteresis state variable
@@ -170,15 +167,9 @@ def algo_scenario3(boiler_states, p_x, battery_state):
 
     if p_x > 0:
         u['bat'] = max((battery_state[SOC] - SOC_MAX)/(CONTROL_TIMESTEP/3600), PMAX_CH , -p_x)
-        '''print("px bigger than 0, and u = ", u['bat'])
-        print("also, max(0,(battery_state[SOC] - SOC_MAX)/(CONTROL_TIMESTEP/60) = ", max(0,(battery_state[SOC] - SOC_MAX)/(CONTROL_TIMESTEP/60)))
-        print("-(p_x - battery_state[POWER]) = ", -(p_x - battery_state[POWER]))'''
     else:
         u['bat'] = min((battery_state[SOC] - SOC_MIN)/(CONTROL_TIMESTEP/3600) , PMAX_DISCH , -p_x)
-        '''print("px smaller than 0, and u = ", u['bat'])
-        print("also, min(0,(battery_state[SOC] - SOC_MIN)/(CONTROL_TIMESTEP/60)) = ",
-              (battery_state[SOC] - SOC_MIN)/(CONTROL_TIMESTEP/60))
-        print("(p_x - battery_state[POWER]) = ", (p_x - battery_state[POWER]))'''
+
     outputs = {'actions': u, 'hyst_states': hyst_states}
     return outputs
 

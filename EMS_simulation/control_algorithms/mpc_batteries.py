@@ -1,10 +1,9 @@
-#!/usr/bin/env python3
+
+
 import pandas as pd
-import matplotlib.pyplot as plt
 from datetime import timedelta
 from datetime import datetime
 from scipy.optimize import linprog
-import random
 import numpy as np
 
 # import scipy as scipy
@@ -31,7 +30,7 @@ TIME_SLOT = 5  # in minutes
 # HORIZON = 20 # in minutes, corresponds to 24 hours
 HORIZON = 1440  # in minutes, corresponds to 24 hours
 # HORIZON = 720  # for testing purposes
-HORIZON = 20  # for testing purposes
+#HORIZON = 20  # for testing purposes
 
 no_slots = int(HORIZON / TIME_SLOT)
 no_slots = int(0.5*HORIZON / TIME_SLOT)
@@ -98,7 +97,7 @@ def get_energy_buy_price():
 
 def get_hot_water_usage_forecast():
 
-	df = pd.read_excel('../data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
+	df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
 	hot_water_usage = df['Hot water usage (litres)'].to_numpy() / (10/TIME_SLOT)  /2# data is in [litres*10min]    # divided by 2 for [litres*5min]
 
 	hot_water_usage = np.repeat(hot_water_usage, int(10/TIME_SLOT))
@@ -107,7 +106,7 @@ def get_hot_water_usage_forecast():
 	return df
 
 def get_excess_power_forecast(iteration):
-	df = pd.read_excel('../data_input/Energie - 00003 - Pache.xlsx', index_col=[0], usecols=[0,1])
+	df = pd.read_excel('data_input/Energie - 00003 - Pache.xlsx', index_col=[0], usecols=[0,1])
 
 	start_index = df.index[df.index == (MPC_START_TIME)][0] # df.index returns a list
 	start_index += timedelta(minutes=iteration*TIME_SLOT)
@@ -121,7 +120,7 @@ def get_excess_power_forecast(iteration):
 	return df
 
 def get_energy_sell_price():
-	df = pd.read_excel('../data_input/energy_sell_price_10min_granularity.xlsx', index_col=[0], usecols=[0,1]).to_numpy()
+	df = pd.read_excel('data_input/energy_sell_price_10min_granularity.xlsx', index_col=[0], usecols=[0,1]).to_numpy()
 	df = np.repeat(df, int(10 / TIME_SLOT))
 	dates = pd.date_range(start=MPC_START_TIME, end='05.05.2018 23:55:00', freq=str(TIME_SLOT) + 'min')
 	df = pd.DataFrame(df, index=dates)
@@ -129,7 +128,7 @@ def get_energy_sell_price():
 
 
 def get_energy_buy_price():
-    df = pd.read_excel('../data_input/energy_buy_price_10min_granularity.xlsx', index_col=[0], usecols=[0, 1]).to_numpy()
+    df = pd.read_excel('data_input/energy_buy_price_10min_granularity.xlsx', index_col=[0], usecols=[0, 1]).to_numpy()
     df = np.repeat(df, int(10 / TIME_SLOT))
     dates = pd.date_range(start=MPC_START_TIME, end='05.05.2018 23:55:00', freq=str(TIME_SLOT) + 'min')
     df = pd.DataFrame(df, index=dates)
