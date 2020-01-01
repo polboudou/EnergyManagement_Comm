@@ -29,7 +29,7 @@ TIME_SLOT = 5  # in minutes
 # HORIZON = 20 # in minutes, corresponds to 24 hours
 HORIZON = 1440  # in minutes, corresponds to 24 hours
 # HORIZON = 720  # for testing purposes
-HORIZON = 20  # for testing purposes
+#HORIZON = 20  # for testing purposes
 
 no_slots = int(HORIZON / TIME_SLOT)
 no_slots = int(0.5*HORIZON / TIME_SLOT)

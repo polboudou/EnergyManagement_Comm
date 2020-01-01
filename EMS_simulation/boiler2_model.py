@@ -19,18 +19,15 @@ SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP))
 
 BOILER2_TEMP_MIN = 30           # in degree celsius
 BOILER2_TEMP_MAX = 60           # in degree celsius
-BOILER2_TEMP_DELTA = 36         # in degrees celsius
 BOILER2_TEMP_INCOMING_WATER = 20  # in degree celsius
-
 BOILER2_RATED_P = -7600         # in Watts
 BOILER2_VOLUME = 800            # in litres
-BOILER2_INITIAL_TEMP = 36       # in degree celsius
+BOILER2_INITIAL_TEMP = 30       # in degree celsius
 C_BOILER = 1 / (4.186 * 997 * BOILER2_VOLUME)     # in [C/(Watt*sec)]
 
 broker_address ="mqtt.teserakt.io"   # use external broker (alternative broker address: "test.mosquitto.org")
 #broker_address ="test.mosquitto.org"   # use external broker (alternative broker address: "mqtt.teserakt.io")
-#broker_address = 'mqtt.eclipse.org'
-#broker_address="broker.hivemq.com"
+
 
 class Boiler():
     def __init__(self, description, simu_timestep, max_power, min_temp, max_temp, current_temp):

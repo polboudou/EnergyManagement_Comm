@@ -15,8 +15,7 @@ from EMS_simulation.control_algorithms import mpc_batteries
 
 broker_address ="mqtt.teserakt.io"   # use external broker (alternative broker address: "test.mosquitto.org")
 #broker_address ="test.mosquitto.org"   # use external broker (alternative broker address: "mqtt.teserakt.io")
-#broker_address = 'mqtt.eclipse.org'
-#broker_address="broker.hivemq.com"
+
 
 
 
@@ -29,9 +28,9 @@ CONTROL_TIMESTEP = 10*60    # in minutes
 CONTROL_TIMESTEP = 5*60    # in minutes
 
 # choose between 'Scenario0' to 'Scenario3'
-scenario = 'MPCbattery'
-scenario = 'MPCboilers'
-#scenario = 'Scenario2'
+#scenario = 'MPCbattery'
+#scenario = 'MPCboilers'
+scenario = 'Scenario0'
 
 BOILER1_TEMP_MIN = 40  # in degree celsius
 BOILER1_TEMP_MAX = 50  # in degree celsius
@@ -175,14 +174,7 @@ def get_excess_power_simulation(p_x_forecast):
 
     return p_x
 
-'''def get_excess_power_simulation(p_x_forecast):
-    # random samples from a uniform distribution around 0
-    p_x_forecast = np.array(p_x_forecast)
-    mean_px = np.nanmean(np.array(p_x_forecast))
-    np.random.seed(1)
-    p_x = p_x_forecast + FORECAST_INACCURACY_COEF*mean_px*np.random.normal(size=len(p_x_forecast))
-    return(p_x)
-'''
+
 def get_energy_sell_price():
     df = pd.read_excel('data_input/energy_sell_price_10min_granularity.xlsx', index_col=[0], usecols=[0, 1])
     sell_price = df['Sell Price (CHF / kWh)'].to_numpy()
@@ -308,7 +300,8 @@ if __name__ == '__main__':
     print("p_x_forecast = ", p_x.tolist())
     print("p_x_measured = ", p_x_measured)
 
-    fig, ax = plt.subplots(1, 1)
+
+    '''fig, ax = plt.subplots(1, 1)
     ax.plot(range(len(controller.pb1_list)), controller.pb1_list, label='Power B1', color='blue', linestyle='-.')
     ax.plot(range(len(controller.pb2_list)), controller.pb2_list, label='Power B2', color='cyan', alpha=0.7)
     ax.plot(range(len(controller.p_bat_list)), controller.p_bat_list, label='Power battery', color='green', alpha=0.7)
@@ -332,7 +325,7 @@ if __name__ == '__main__':
     ax2.legend(loc=1)
     ax.legend(loc=2)
     # plt.show()
-    plt.savefig('simu_output/'+scenario+'.pdf')
+    plt.savefig('simu_output/'+scenario+'.pdf')'''
 
     cost = 0
     for h in SIMU_STEPS:
@@ -345,69 +338,13 @@ if __name__ == '__main__':
         if p_grid_silutation <= 0:
             cost += p_grid_silutation * buy_price[h]
 
-    print("Electricity cost of the simulated ", HORIZON / 60, " hours is ", cost)
-    #print("Cost assuming that p_x has no disturbance and remains the same between two control steps: ", real_cost)
+    print("Daily electricity cost with strategy", scenario, 'is:', round(cost,2))
 
-    result = "Electricity cost of the simulated " + str(HORIZON / 60) + " hours is" + str(cost) + 'CHF'
-
-
-
-    ############################       PLOTTING FOR SCENARIO 1     ###########################
-    fig, ax = plt.subplots(2, 1)
-    ax[0].plot(range(len(controller.pb1_list)), controller.pb1_list, label ='Power B1', color='blue', linestyle='-.')
-    ax[0].plot(range(len(controller.pb2_list)), controller.pb2_list, label ='Power B2', color='cyan', alpha=0.7)
-    ax[0].plot(range(len(controller.p_bat_list)), controller.p_bat_list, label ='Power battery', color='green', alpha=0.7)
-    ax[0].plot(range(len(p_x)), p_x, label ='P_pv - P_load', color='grey', alpha=0.7)
-    ax2 = ax[0].twinx()
-    ax2.plot(range(len(controller.Tb1_list)), controller.Tb1_list, label ='Temperature B1', color='red')
-    ax2.plot(range(len(controller.Tb2_list)), controller.Tb2_list, label ='Temperature B2', color='orange', linestyle='-.')
-    ax[1].plot(range(len(controller.soc_bat_list)), controller.soc_bat_list, label = 'SOC battery')
-    plt.xlabel("Time [min]")
-    plt.ylabel('Temperature [C]')
-    plt.text(1, 1, result , ha='left', wrap=True)
-    plt.legend()
-    ax2.legend(loc=1)
-    ax[0].legend(loc=2)
-    ax[1].legend()
-    plt.savefig('simu_output/boilers_evolution_'+scenario+'.pdf')
-    ###########################################################################################
 
     time.sleep(1)
     controller.client.publish('boilers', 'End')
     controller.client.loop_stop()
     controller.client.disconnect(broker_address)
 
-    fig, ax = plt.subplots(1, 1)
-    ax.plot(range(len(p_x)), p_x, label ='p_x', color='blue')
-    ax.plot(range(len(p_x_measured)), p_x_measured, label ='p_x_measured', color='cyan', alpha=0.7)
-    #ax.plot(range(len(controller.p_bat_list)), controller.p_bat_list, label ='Power battery', color='green', alpha=0.7)
-    #ax.plot(range(len(p_x)), p_x, label ='P_pv - P_load', color='grey', alpha=0.7)
-    #ax2 = ax.twinx()
-    #ax2.plot(range(len(controller.Tb1_list)), controller.Tb1_list, label ='Temperature B1', color='red')
-    #ax2.plot(range(len(controller.Tb2_list)), controller.Tb2_list, label ='Temperature B2', color='orange', linestyle='-.')
-    plt.xlabel("Time [min]")
-    plt.ylabel('Temperature [C]')
-    plt.legend()
-    #ax2.legend(loc=1)
-    #ax.legend(loc=2)
-    plt.savefig('simu_output/p_x_simulation.pdf')
 
-
-
-
-'''    ############################       PLOTTING FOR SCENARIO 2     ###########################
-    fig, axes = plt.subplots(2, 1)
-    axes[0].plot(range(SIMU_STEPS), controller.pb1_list, label = 'Power B1', color='blue', linestyle='-.')
-    axes[0].plot(range(SIMU_STEPS), controller.pb2_list, label = 'Power B2', color='blue')
-    ax2 = axes[0].twinx()
-    ax2.plot(range(SIMU_STEPS), controller.Tb1_list, label = 'Temperature B1', color='red', linestyle='-.')
-    ax2.plot(range(SIMU_STEPS), controller.Tb2_list, label = 'Temperature B2', color='red')
-    axes[1].plot(range(SIMU_STEPS), controller.sb1_list, label = 'Hysteresis state B1')
-    axes[1].plot(range(SIMU_STEPS), controller.sb2_list, label = 'Hysteresis state B2')
-    plt.legend()
-    ax2.legend(loc=1)
-    axes[0].legend(loc=2)
-    axes[1].legend()
-    plt.savefig('simu_output/boilers_evolution_'+scenario+'.pdf')
-    ###########################################################################################'''
 

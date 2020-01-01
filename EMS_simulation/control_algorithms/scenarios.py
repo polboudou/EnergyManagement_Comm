@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
 
-######################################################################################
-###    Scenario 2 adds to scenario 1 an hysteresis type logic for boiler control   ###
-######################################################################################
-
 
 import numpy as np
 import operator
@@ -18,7 +14,7 @@ SIMU_TIMESTEP = 30  # in minutes
 CONTROL_TIMESTEP = 10*60
 HORIZON = 1440*60  # in minutes, corresponds to 24 hours
 #HORIZON = 720*60  # for testing purposes
-HORIZON = 60*60  # for testing purposes
+#HORIZON = 60*60  # for testing purposes
 
 
 BOILER1_TEMP_MIN = 40   # in degree celsius
@@ -83,14 +79,9 @@ def algo_scenario0(boiler_states):
 
 
 
-# Control algorithm
 def algo_scenario1(boiler_states, p_x):
 
-
     u_B = {1: 0, 2: 0}
-    #u_B = {1: boiler_states[1][POWER], 2: boiler_states[2][POWER]}
-    #if p_x <= 0:
-    #    u_B = {1: 0, 2: 0}
     hyst_states = {1: 0, 2: 0}
     #p_x = p_x + boiler_states[1][POWER] + boiler_states[2][POWER]
     boiler_states_sorted = sorted(boiler_states.items(), key=operator.itemgetter(1))
@@ -115,8 +106,6 @@ def algo_scenario1(boiler_states, p_x):
                 u_B[boiler] = max(- error_Temp / C_BOILER, BOILERS_RATED_P[boiler], -p_x)
                 p_x += u_B[boiler]
 
-
-
     outputs = {'actions': u_B, 'hyst_states': hyst_states}
     return outputs
 
@@ -138,7 +127,6 @@ def algo_scenario1(boiler_states, p_x):
 
     return u_B'''
 
-# Control algorithm
 def algo_scenario2(boiler_states, p_x, battery_state):
 
     u = {1: 0, 2: 0, 'bat': 0}
