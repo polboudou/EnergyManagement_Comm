@@ -163,6 +163,7 @@ def mpc_iteration(p_x, hot_water, T_B1_init, T_B2_init, iteration):
             A_eq.append(row)
             b_eq.append(-excess_power_forecast[0])
 
+        # Boiler models constraints
         hot_water_usage_forecast_index = \
         hot_water_usage_forecast_df.index[hot_water_usage_forecast_df.index == current_time][
             0]  # df.index returns a list
@@ -179,7 +180,6 @@ def mpc_iteration(p_x, hot_water, T_B1_init, T_B2_init, iteration):
         # the density of water is 997 grams / litre
         Bb1 = (TIME_SLOT * 60) / (4.186 * 997 * BOILER1_VOLUME)  # time slots are converted to seconds.
         Bb2 = (TIME_SLOT * 60) / (4.186 * 997 * BOILER2_VOLUME)  # time slots are converted to seconds.
-
         if x == 0:
             # variables are Epsilon, Pg, Pb1, Pb2, Tb1, Tb2 for each time slot
             row = [0] * no_ctrl_vars

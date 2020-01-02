@@ -95,7 +95,7 @@ def mpc_iteration(p_x, hot_water, T_B1_init, T_B2_init, soc_bat_init, iteration)
     energy_buy_price_df = get_energy_buy_price()
 
     ############ Set up the optimisation problem
-
+    
     current_time = datetime.strptime(MPC_START_TIME, "%m.%d.%Y %H:%M:%S") + timedelta(minutes=iteration * TIME_SLOT)
     print(current_time)
     indices = []
@@ -152,7 +152,7 @@ def mpc_iteration(p_x, hot_water, T_B1_init, T_B2_init, soc_bat_init, iteration)
             b_eq.append(-excess_power_forecast[0])
 
 
-        #######################     Battery model     ##########################
+        # Battery model constraints
         row = [0] * no_ctrl_vars
         row[x * NO_CTRL_VARS_PS + 7] = 1
         row[x * NO_CTRL_VARS_PS + 6] = TIME_SLOT/60
@@ -162,19 +162,16 @@ def mpc_iteration(p_x, hot_water, T_B1_init, T_B2_init, soc_bat_init, iteration)
         else:
             row[x * NO_CTRL_VARS_PS -1] = -1
             b_eq.append(0)
-        ########################################################################
 
-        # Boiler 1 and 2 are connected in series. The newV is the same for both boilers in this case.
+        # Boiler model constraints
         hot_water_usage_forecast_index = \
         hot_water_usage_forecast_df.index[hot_water_usage_forecast_df.index == current_time][
             0]  # df.index returns a list
         hot_water_usage_forecast = hot_water_usage_forecast_df.loc[hot_water_usage_forecast_index]
-
         if x == 0:
             newV = hot_water
         else:
             newV = hot_water_usage_forecast[0]
-
         Ab1 = 1 - newV / BOILER1_VOLUME
         Ab2 = 1 - newV / BOILER2_VOLUME
         Cb1 = newV / BOILER1_VOLUME
@@ -183,7 +180,6 @@ def mpc_iteration(p_x, hot_water, T_B1_init, T_B2_init, soc_bat_init, iteration)
         # the density of water is 997 grams / litre
         Bb1 = (TIME_SLOT * 60) / (4.186 * 997 * BOILER1_VOLUME)  # time slots are converted to seconds.
         Bb2 = (TIME_SLOT * 60) / (4.186 * 997 * BOILER2_VOLUME)  # time slots are converted to seconds.
-
         # variables are Epsilon, Pg, Pb1, Pb2, Tb1, Tb2, Pbat, Ebat for each time slot
         if x == 0:
             row = [0] * no_ctrl_vars

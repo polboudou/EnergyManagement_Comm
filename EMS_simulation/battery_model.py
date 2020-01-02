@@ -85,6 +85,7 @@ def message_handler(client, msg):
 
 if __name__ == '__main__':
 
+    # instatiating battery and connecting to controller
     time.sleep(2)
     r = random.randrange(1, 100000)
     cname = "Battery_" + str(r)     # broker doesn't like when two clients with same name connect
@@ -95,6 +96,7 @@ if __name__ == '__main__':
     battery.client.publish('battery/power', battery.current_power)
     battery.client.publish('battery/soc', battery.current_soc)
 
+    # with the simulation frequency, update model and send state to controller
     for t in SIMU_STEPS:
         if not (battery.time_step % CONTROL_TIMESTEP):
             while not battery.control_received:
@@ -106,5 +108,6 @@ if __name__ == '__main__':
         battery.model()
         battery.control_received = False
 
+    # close connection with controller
     battery.client.loop_stop()
     battery.client.disconnect(broker_address)

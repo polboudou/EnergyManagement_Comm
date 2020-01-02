@@ -245,6 +245,7 @@ def message_handler(client, msg):
 
 if __name__ == '__main__':
 
+    # instantiate controller and connect to other entities
     r = random.randrange(1, 100000)
     cname = scenario + "-" + str(r)     # broker doesn't like when two clients with same name connect
     controller = Controller(cname)
@@ -256,19 +257,21 @@ if __name__ == '__main__':
         controller.client.subscribe("battery/soc")
         controller.client.subscribe("battery/power")
 
+    # get non-controllable variables
     sell_price = get_energy_sell_price()
     buy_price = get_energy_buy_price()
     p_x = get_excess_power_forecast()
     p_x_measured = get_excess_power_simulation(p_x)
     hot_water_use = get_hot_water_usage()
 
-    # wait until receives first measurements of b1, b2
+    # wait until other entities are instantiated
     while controller.Tb1 == 0 or controller.Tb2 == 0:
         time.sleep(0.01)
     if scenario == 'Scenario2' or scenario == 'MPCbattery':
         while controller.soc_bat == 0:
             time.sleep(0.01)
 
+    # launch control algo each CONTROL STEP taking last measurements from entities
     for h in CONTROL_STEPS:
         print("controller period at", h, 'min')
         time.sleep(0.1*(CONTROL_TIMESTEP/SIMU_TIMESTEP))
@@ -280,6 +283,7 @@ if __name__ == '__main__':
         if scenario == 'Scenario2' or scenario == 'MPCbattery':
             controller.client.publish('batteryMS', str(actions['bat']))
 
+    # first measurement received was an init message. we remove it
     controller.pb1_list.pop(0)
     controller.pb2_list.pop(0)
     controller.Tb1_list.pop(0)
@@ -298,6 +302,7 @@ if __name__ == '__main__':
     print("p_x_measured = ", p_x_measured)
     print("hot_water_use = ", hot_water_use)
 
+    # compute cost of the simulated power exchange with the grid
     cost = 0
     for h in SIMU_STEPS:
         p_grid_silutation = (p_x_measured[h] + controller.pb1_list[h] + controller.pb2_list[h]) / (3600/SIMU_TIMESTEP) * 0.001 # convert Watt to kWh
@@ -310,10 +315,6 @@ if __name__ == '__main__':
             cost += p_grid_silutation * buy_price[h]
 
     print("Daily electricity cost with ", scenario, 'is:', round(cost,2))
-
-
-
-
 
 
     '''fig, ax = plt.subplots(1, 1)

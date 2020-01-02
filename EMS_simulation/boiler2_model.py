@@ -114,6 +114,7 @@ def message_handler(client, msg):
 
 if __name__ == '__main__':
 
+    # instatiate boiler and connect to controller
     time.sleep(2)
     r = random.randrange(1, 100000)
     cname = "Boiler2-" + str(r)     # broker doesn't like when two clients with same name connect
@@ -122,6 +123,7 @@ if __name__ == '__main__':
     boiler2.client.publish('boiler2_sensor/power', boiler2.power)
     boiler2.client.publish('boiler2_sensor/temp', boiler2.current_temp)
 
+    # with the simulation frequency, update model and send state to controller
     for t in SIMU_STEPS:
         if not (boiler2.time % CONTROL_TIMESTEP): # only true when model timestep is a multiple of control period (model has to wait for control period)
             while not boiler2.control_received:
@@ -133,6 +135,7 @@ if __name__ == '__main__':
         boiler2.model()
         boiler2.control_received = False
 
+    # close connection with controller
     time.sleep(5)
     boiler2.client.loop_stop()
     boiler2.client.disconnect(broker_address)

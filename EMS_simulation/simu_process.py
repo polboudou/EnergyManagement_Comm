@@ -6,6 +6,7 @@ scenario = 'MPCbattery'
 #scenario = 'MPCboilers'
 
 # simulation parameters as well as load parameters need to be changed in each entity process
+# if CONTROL PERIOD wants to be changed, it has to be changed in each of the entity scripts.
 
 if __name__ == '__main__':
 
