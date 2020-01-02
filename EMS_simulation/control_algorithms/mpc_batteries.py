@@ -95,7 +95,7 @@ def mpc_iteration(p_x, hot_water, T_B1_init, T_B2_init, soc_bat_init, iteration)
     energy_buy_price_df = get_energy_buy_price()
 
     ############ Set up the optimisation problem
-    
+
     current_time = datetime.strptime(MPC_START_TIME, "%m.%d.%Y %H:%M:%S") + timedelta(minutes=iteration * TIME_SLOT)
     print(current_time)
     indices = []
