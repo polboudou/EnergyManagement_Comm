@@ -23,7 +23,7 @@ PMAX_DISCH = 5000          # Max battery discharging power (W)
 
 broker_address ="mqtt.teserakt.io"   # use external broker (alternative broker address: "test.mosquitto.org")
 #broker_address ="test.mosquitto.org"   # use external broker (alternative broker address: "mqtt.teserakt.io")
-#broker_address = 'mqtt.eclipse.org'
+
 
 
 class Battery():
@@ -44,14 +44,13 @@ class Battery():
 
     def model(self):
         self.current_soc = self.current_soc - (self.dt/3600) * self.current_power
-        #print("model current soc =", self.current_soc)
         self.time_step += self.dt
 
 
     def setup_client(self):
         client = mqtt.Client(self.description)
         client.on_connect = on_connect
-        #client.on_log = on_log
+        # client.on_log = on_log     # uncomment to see messages received and sent by battery
         client.on_disconnect = on_disconnect
         client.on_message = on_message_battery
         client.connect(broker_address)
@@ -59,7 +58,6 @@ class Battery():
         return client
 
 # callback functions for communication
-
 def on_log(client, userdata, level, buf):
      print("log: ",buf)
 
@@ -88,7 +86,6 @@ def message_handler(client, msg):
 if __name__ == '__main__':
 
     time.sleep(2)
-    print('Instantiating battery entity!')
     r = random.randrange(1, 100000)
     cname = "Battery_" + str(r)     # broker doesn't like when two clients with same name connect
     battery = Battery(cname, SIMU_TIMESTEP, PMAX_CH, PMAX_DISCH, SOC_MIN, SOC_MAX, current_soc=SOC_MIN)

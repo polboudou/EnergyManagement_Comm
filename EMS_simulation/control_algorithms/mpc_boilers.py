@@ -55,6 +55,7 @@ BOILER2_VOLUME = 800  # in litres
 def get_hot_water_usage_forecast():
     df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0],
                        usecols=[0, 1])
+
     hot_water_usage = df['Hot water usage (litres)'].to_numpy() / (
                 10 / TIME_SLOT) / 2  # data is in [litres*10min]    # divided by 2 for [litres*5min]
 
@@ -96,8 +97,7 @@ def get_energy_buy_price():
     return df
 
 
-def mpc_iteration(p_x, T_B1_init, T_B2_init, iteration):
-    # Get disturbance forecasts
+def mpc_iteration(p_x, hot_water, T_B1_init, T_B2_init, iteration):
     # 1. Get excess solar power forecasts
     excess_power_forecast_df = get_excess_power_forecast(iteration)
 
@@ -121,7 +121,7 @@ def mpc_iteration(p_x, T_B1_init, T_B2_init, iteration):
     NO_CTRL_VARS_PS = 6  # control (decision) variables are Epsilon, Pg, Pb1, Pb2, Tb1, Tb2 for each time slot
     no_ctrl_vars = NO_CTRL_VARS_PS * no_slots
     c = []
-    bounds = []  # before passing to the OP, we'll convert it to a tuple (currently list because of frequent append operations)
+    bounds = []
     A_eq = []
     b_eq = []
     A_ub = []
@@ -131,7 +131,6 @@ def mpc_iteration(p_x, T_B1_init, T_B2_init, iteration):
         # 1. Setup the objective function
         c.append(1)  # variables are Epsilon, Pg, Pb1, Pb2, Tb1, Tb2 for each time slot
         c.extend([0, 0, 0, 0, 0])
-        # print (c)
 
         # 2. Setup the bounds for the control variables
         epsilon_bounds = (None, None)
@@ -148,16 +147,15 @@ def mpc_iteration(p_x, T_B1_init, T_B2_init, iteration):
             0]  # df.index returns a list
         excess_power_forecast = excess_power_forecast_df.loc[excess_power_forecast_index]
 
-        if x == 0:
-            # power balance constraint
+        # power balance constraint
+        if x == 0:  # the measured excess power is considered
             row = [0] * no_ctrl_vars
             row[x * NO_CTRL_VARS_PS + 1] = 1  # variables are Epsilon, Pg, Pb1, Pb2, Tb1, Tb2 for each time slot
             row[x * NO_CTRL_VARS_PS + 2] = 1
             row[x * NO_CTRL_VARS_PS + 3] = 1
             A_eq.append(row)
-            b_eq.append(-p_x)   # we use the measurement for t=0, else the forecast.
-        else:
-            # power balance constraint
+            b_eq.append(-p_x)
+        else:   # the forecasted excess is considered
             row = [0] * no_ctrl_vars
             row[x * NO_CTRL_VARS_PS + 1] = 1  # variables are Epsilon, Pg, Pb1, Pb2, Tb1, Tb2 for each time slot
             row[x * NO_CTRL_VARS_PS + 2] = 1
@@ -165,16 +163,14 @@ def mpc_iteration(p_x, T_B1_init, T_B2_init, iteration):
             A_eq.append(row)
             b_eq.append(-excess_power_forecast[0])
 
-
-
-        # Boiler 1 and 2 are connected in series. The newV is the same for both boilers in this case.
         hot_water_usage_forecast_index = \
         hot_water_usage_forecast_df.index[hot_water_usage_forecast_df.index == current_time][
             0]  # df.index returns a list
         hot_water_usage_forecast = hot_water_usage_forecast_df.loc[hot_water_usage_forecast_index]
-        # newV = 0 # for testing purposes
-        # print (hot_water_usage_forecast[0])
-        newV = hot_water_usage_forecast[0]
+        if x == 0:
+            newV = hot_water
+        else:
+            newV = hot_water_usage_forecast[0]
         Ab1 = 1 - newV / BOILER1_VOLUME
         Ab2 = 1 - newV / BOILER2_VOLUME
         Cb1 = newV / BOILER1_VOLUME
@@ -238,30 +234,16 @@ def mpc_iteration(p_x, T_B1_init, T_B2_init, iteration):
 
     bounds = tuple(bounds)
 
-    '''print ("c is")
-    print (c)
-    print ("bounds are")
-    print (bounds)
-    print ("A_eq is")
-    print (A_eq)
-    print ("b_eq is")
-    print (b_eq)
-    print ("A_ub is")
-    print (A_ub)
-    print ("b_ub is")
-    print (b_ub)'''
-
-    # res = linprog(c, A_eq=A_eq, b_eq=b_eq, A_ub=A_ub, b_ub=b_ub, bounds=bounds, method='interior-point', options={"disp": True, "maxiter": 50000, 'tol': 1e-6})
     res = linprog(c, A_eq=A_eq, b_eq=b_eq, A_ub=A_ub, b_ub=b_ub, bounds=bounds,
                   options={"disp": False, "maxiter": 50000, 'tol': 1e-6})
     # print (res)
 
-
     x = 0
-    print("tb1 =", res.x[4], 'tb2=', res.x[5])
-    print("pg =", res.x[1])
-    print("epsilon =", res.x[0])
+    # print("tb1 =", res.x[4], 'tb2=', res.x[5])
+    # print("pg =", res.x[1])
+    # print("epsilon =", res.x[0])
     outputs = {1: res.x[2], 2: res.x[3]}
     print("p1, p2: ", outputs)
+
     return outputs
 

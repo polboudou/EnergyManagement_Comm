@@ -28,9 +28,9 @@ CONTROL_TIMESTEP = 10*60    # in minutes
 CONTROL_TIMESTEP = 5*60    # in minutes
 
 # choose between 'Scenario0' to 'Scenario3'
-#scenario = 'MPCbattery'
+scenario = 'MPCbattery'
 #scenario = 'MPCboilers'
-scenario = 'Scenario0'
+#scenario = 'Scenario0'
 
 BOILER1_TEMP_MIN = 40  # in degree celsius
 BOILER1_TEMP_MAX = 50  # in degree celsius
@@ -52,7 +52,7 @@ CONTROL_STEPS = range(0, int(HORIZON/SIMU_TIMESTEP), int(CONTROL_TIMESTEP/SIMU_T
 #CONTROL_STEPS = range(int(HORIZON/CONTROL_TIMESTEP))
 
 
-SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP))
+SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP)-10)
 
 FORECAST_INACCURACY_COEF = 0.1  # 0 for perfect accuracy, 1 for big inaccuracy
 
@@ -79,7 +79,7 @@ class Controller():
         self.p_bat_list = []
 
 
-    def run_algorithm(self, p_x):
+    def run_algorithm(self, p_x, water):
 
         if 'Scenario0' in self.description:
             output = scenarios.algo_scenario0({1: [self.Tb1, self.pb1, self.sb1], 2: [self.Tb2, self.pb2, self.sb2]})
@@ -107,7 +107,7 @@ class Controller():
 
         if 'MPCboilers' in self.description:
             start = time.time()
-            output = mpc_boilers.mpc_iteration(p_x, self.Tb1, self.Tb2, self.control_iter)
+            output = mpc_boilers.mpc_iteration(p_x, water, self.Tb1, self.Tb2, self.control_iter)
             print("---------MPC computing time =", time.time()-start)
             print("outputs mpc:", output)
             self.control_iter += 1
@@ -116,7 +116,7 @@ class Controller():
         if 'MPCbattery' in self.description:
             print("battery soc ", self.soc_bat)
             start = time.time()
-            output = mpc_batteries.mpc_iteration(p_x, self.Tb1, self.Tb2, self.soc_bat, self.control_iter)
+            output = mpc_batteries.mpc_iteration(p_x, water, self.Tb1, self.Tb2, self.soc_bat, self.control_iter)
             print("---------MPC computing time =", time.time()-start)
             print("outputs mpc:", output)
             self.control_iter += 1
@@ -173,6 +173,14 @@ def get_excess_power_simulation(p_x_forecast):
             p_x[i] = p_x_forecast[i] - random.uniform(0, FORECAST_INACCURACY_COEF*p_x_forecast[i])
 
     return p_x
+
+def get_hot_water_usage():
+
+    measured = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0],
+                       usecols=[0, 2])
+    actual = measured['Actual'].to_numpy()/ (10 / (CONTROL_TIMESTEP/60)) / 2
+    actual = np.repeat(actual, int(10 / (CONTROL_TIMESTEP/60)))
+    return actual.tolist()
 
 
 def get_energy_sell_price():
@@ -237,7 +245,6 @@ def message_handler(client, msg):
 
 if __name__ == '__main__':
 
-    print('Instantiating controller!')
     r = random.randrange(1, 100000)
     cname = scenario + "-" + str(r)     # broker doesn't like when two clients with same name connect
     controller = Controller(cname)
@@ -253,6 +260,7 @@ if __name__ == '__main__':
     buy_price = get_energy_buy_price()
     p_x = get_excess_power_forecast()
     p_x_measured = get_excess_power_simulation(p_x)
+    hot_water_use = get_hot_water_usage()
 
     # wait until receives first measurements of b1, b2
     while controller.Tb1 == 0 or controller.Tb2 == 0:
@@ -261,21 +269,11 @@ if __name__ == '__main__':
         while controller.soc_bat == 0:
             time.sleep(0.01)
 
-    print('algo')
-
     for h in CONTROL_STEPS:
-    #for h in range(2):
-        #time.sleep(0.1)
-        #controller.client.publish(' boilers', 'Request measurement')
         print("controller period at", h, 'min')
         time.sleep(0.1*(CONTROL_TIMESTEP/SIMU_TIMESTEP))
-        if scenario == 'Scenario2' or scenario == 'MPCbattery':
-            print("len(controller.pb1), len(controller.Tb2), len(controller.p_bat_list) ", len(controller.pb1_list), len(controller.Tb2_list), len(controller.p_bat_list))
-        else:
-            print("len(controller.pb1), len(controller.Tb2) ", len(controller.pb1_list), len(controller.Tb2_list))
-
-        actions = controller.run_algorithm(p_x_measured[h])
-        print('actions ', actions)
+        print("len(controller.pb1), len(controller.Tb2) ", len(controller.pb1_list), len(controller.Tb2_list))
+        actions = controller.run_algorithm(p_x_measured[h], hot_water_use[int(h/(CONTROL_TIMESTEP/SIMU_TIMESTEP))])
 
         controller.client.publish('boiler1_actuator', str(actions[1]))
         controller.client.publish('boiler2_actuator', str(actions[2]))
@@ -290,7 +288,6 @@ if __name__ == '__main__':
         controller.p_bat_list.pop(0)
         controller.soc_bat_list.pop(0)
 
-    # computing cost
     print("pb1_list = ", controller.pb1_list)
     print("pb2_list = ", controller.pb2_list)
     print("Tb1_list = ", controller.Tb1_list)
@@ -299,6 +296,24 @@ if __name__ == '__main__':
     print("p_bat_list = ", controller.p_bat_list)
     print("p_x_forecast = ", p_x.tolist())
     print("p_x_measured = ", p_x_measured)
+    print("hot_water_use = ", hot_water_use)
+
+    cost = 0
+    for h in SIMU_STEPS:
+        p_grid_silutation = (p_x_measured[h] + controller.pb1_list[h] + controller.pb2_list[h]) / (3600/SIMU_TIMESTEP) * 0.001 # convert Watt to kWh
+        if scenario == 'Scenario2' or scenario == 'MPCbattery':
+            p_grid_silutation += controller.p_bat_list[h] / (3600/SIMU_TIMESTEP) * 0.001 # convert Watt to kWh
+
+        if p_grid_silutation > 0:
+            cost += p_grid_silutation * sell_price[h]
+        if p_grid_silutation <= 0:
+            cost += p_grid_silutation * buy_price[h]
+
+    print("Daily electricity cost with ", scenario, 'is:', round(cost,2))
+
+
+
+
 
 
     '''fig, ax = plt.subplots(1, 1)
@@ -326,20 +341,6 @@ if __name__ == '__main__':
     ax.legend(loc=2)
     # plt.show()
     plt.savefig('simu_output/'+scenario+'.pdf')'''
-
-    cost = 0
-    for h in SIMU_STEPS:
-        p_grid_silutation = (p_x_measured[h] + controller.pb1_list[h] + controller.pb2_list[h]) / (3600/SIMU_TIMESTEP) * 0.001 # convert Watt to kWh
-        if scenario == 'Scenario2' or scenario == 'MPCbattery':
-            p_grid_silutation += controller.p_bat_list[h] / (3600/SIMU_TIMESTEP) * 0.001 # convert Watt to kWh
-
-        if p_grid_silutation > 0:
-            cost += p_grid_silutation * sell_price[h]
-        if p_grid_silutation <= 0:
-            cost += p_grid_silutation * buy_price[h]
-
-    print("Daily electricity cost with strategy", scenario, 'is:', round(cost,2))
-
 
     time.sleep(1)
     controller.client.publish('boilers', 'End')

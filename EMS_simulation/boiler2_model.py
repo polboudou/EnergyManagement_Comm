@@ -52,8 +52,6 @@ class Boiler():
         A = 1 - self.hot_water_usage[self.time_step] / BOILER2_VOLUME
         D = self.hot_water_usage[self.time_step] / BOILER2_VOLUME
         self.current_temp = A * self.current_temp - C_BOILER * self.dt * self.power + D * BOILER2_TEMP_INCOMING_WATER
-        #print('current temp boiler2 ', self.current_temp)
-        #print('current power boiler2 ', self.power)
 
         self.time_step += 1
         self.time += self.dt
@@ -69,6 +67,7 @@ class Boiler():
         client.loop_start()  # without the loop, the MQTT call back functions dont get processed
         return client
 
+
 def new_resolution(y, step, days):
     time_steps = np.arange(0, len(y))
 
@@ -81,8 +80,8 @@ def new_resolution(y, step, days):
 
 
 def get_hot_water_usage_simu():
-    df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
-    hot_water_usage = df['Hot water usage (litres)'].to_numpy()/2  /(10*60/SIMU_TIMESTEP) # data is in [litres*10min]    # divided by 3 for test purposes
+    df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,2])
+    hot_water_usage = df['Actual'].to_numpy()/2  /(10*60/SIMU_TIMESTEP) # data is in [litres*10min]    # divided by 3 for test purposes
     hot_water_usage = new_resolution(hot_water_usage, SIMU_TIMESTEP, len(hot_water_usage)*10/(60*24))
     return hot_water_usage
 
@@ -116,7 +115,6 @@ def message_handler(client, msg):
 if __name__ == '__main__':
 
     time.sleep(2)
-    print('Instantiating boiler 2 entity!')
     r = random.randrange(1, 100000)
     cname = "Boiler2-" + str(r)     # broker doesn't like when two clients with same name connect
     boiler2 = Boiler(cname, SIMU_TIMESTEP, BOILER2_RATED_P, BOILER2_TEMP_MIN, BOILER2_TEMP_MAX, BOILER2_INITIAL_TEMP)
@@ -125,8 +123,7 @@ if __name__ == '__main__':
     boiler2.client.publish('boiler2_sensor/temp', boiler2.current_temp)
 
     for t in SIMU_STEPS:
-        if not (boiler2.time % CONTROL_TIMESTEP): #only true when model timestep is a multiple of control period (model has to wait for control period)
-            #print('waiting for boiler 2 to receive control. boiler2 time:', boiler2.time_step)
+        if not (boiler2.time % CONTROL_TIMESTEP): # only true when model timestep is a multiple of control period (model has to wait for control period)
             while not boiler2.control_received:
                 time.sleep(0.001)
         boiler2.client.publish('boiler2_sensor/temp', boiler2.current_temp)

@@ -6,22 +6,6 @@ from datetime import datetime
 from scipy.optimize import linprog
 import numpy as np
 
-# import scipy as scipy
-# print (scipy.version.version)
-# exit()
-
-# # test a small OP
-# c = [1, 2]
-# # xbounds = (-1, 10)
-# # ybounds = (-10, 3)
-# xbounds = (-1, None)
-# ybounds = (-10, 3)
-# bounds = (xbounds, ybounds)
-# A_ub = [[-4, -3], [1, 0]]
-# b_ub = [30, 10]
-# res = linprog(c, A_ub=A_ub, b_ub=b_ub, bounds=bounds, options={"disp": True})
-# print (res)
-# exit()
 
 
 # define constants
@@ -58,45 +42,7 @@ BATTERY_CHARGE_POWER_LIMIT = -5000           # in Watts
 BATTERY_DISCHARGE_POWER_LIMIT = 5000       # in Watts
 
 
-
-'''
-def get_excess_power_forecast(iteration):
-	df = pd.read_excel('data_input/Energie - 00003 - Pache.xlsx', index_col=[0], usecols=[0,1])
-	df['excess_power (kW) (Psolar - Pload)'] = df['Flux energie au point d\'injection (kWh)'] * (-6000) # Convert the energy (kWh) to power (kW) and power convention (buy positive and sell negative)
-	del df['Flux energie au point d\'injection (kWh)'] # we do not need the energy column anymore
-
-	start_index = df.index[df.index == (MPC_START_TIME)][0] # df.index returns a list
-	start_index += timedelta(minutes=iteration*TIME_SLOT)
-	end_index = start_index + timedelta(minutes = HORIZON - TIME_SLOT)
-	excess_power_forecast_df = df.loc[start_index:end_index]
-	#excess_power_forecast_df.plot.line(y='excess_power (kW) (Psolar - Pload)')
-	#plt.savefig('../../figs_output/power_profile_at_connection_point_05mai2018.pdf')
-	return excess_power_forecast_df
-
-
 def get_hot_water_usage_forecast():
-	df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
-	#df.plot.line(y='Hot water usage (litres)')
-	#plt.savefig('../../figs_output/hot_water_usage_profile_24hrs.pdf')
-	return df
-
-
-def get_energy_sell_price():
-	df = pd.read_excel('data_input/energy_sell_price_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
-	#df.plot.line(y='Sell Price (CHF / kWh)')
-	#plt.savefig('../../figs_output/energy_sell_price_24hrs.pdf')
-	return df
-
-
-def get_energy_buy_price():
-	df = pd.read_excel('data_input/energy_buy_price_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
-	#df.plot.line(y='Buy Price (CHF / kWh)')
-	#plt.savefig('../../figs_output/energy_buy_price_24hrs.pdf')
-	return df
-'''
-
-def get_hot_water_usage_forecast():
-
 	df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
 	hot_water_usage = df['Hot water usage (litres)'].to_numpy() / (10/TIME_SLOT)  /2# data is in [litres*10min]    # divided by 2 for [litres*5min]
 
@@ -135,7 +81,7 @@ def get_energy_buy_price():
     return df
 
 
-def mpc_iteration(p_x, T_B1_init, T_B2_init, soc_bat_init, iteration):
+def mpc_iteration(p_x, hot_water, T_B1_init, T_B2_init, soc_bat_init, iteration):
     # Get disturbance forecasts
     # 1. Get excess solar power forecasts
     excess_power_forecast_df = get_excess_power_forecast(iteration)
@@ -224,7 +170,11 @@ def mpc_iteration(p_x, T_B1_init, T_B2_init, soc_bat_init, iteration):
             0]  # df.index returns a list
         hot_water_usage_forecast = hot_water_usage_forecast_df.loc[hot_water_usage_forecast_index]
 
-        newV = hot_water_usage_forecast[0]
+        if x == 0:
+            newV = hot_water
+        else:
+            newV = hot_water_usage_forecast[0]
+
         Ab1 = 1 - newV / BOILER1_VOLUME
         Ab2 = 1 - newV / BOILER2_VOLUME
         Cb1 = newV / BOILER1_VOLUME
@@ -282,34 +232,20 @@ def mpc_iteration(p_x, T_B1_init, T_B2_init, soc_bat_init, iteration):
         current_time = current_time + timedelta(minutes=TIME_SLOT)
         indices.append(current_time)
 
-
     bounds = tuple(bounds)
 
-    '''print ("c is")
-    print (c)
-    print ("bounds are")
-    print (bounds)
-    print ("A_eq is")
-    print (A_eq)
-    print ("b_eq is")
-    print (b_eq)
-    print ("A_ub is")
-    print (A_ub)
-    print ("b_ub is")
-    print (b_ub)'''
-
-    # res = linprog(c, A_eq=A_eq, b_eq=b_eq, A_ub=A_ub, b_ub=b_ub, bounds=bounds, method='interior-point', options={"disp": True, "maxiter": 50000, 'tol': 1e-6})
     res = linprog(c, A_eq=A_eq, b_eq=b_eq, A_ub=A_ub, b_ub=b_ub, bounds=bounds,
                   options={"disp": False, "maxiter": 50000, 'tol': 1e-6})
     #print(res)
 
     # outputs = {1: pb1[0], 2: pb2[0]], 'bat': p_bat}
     x = 0
-    print("tb1 =", res.x[4], 'tb2=', res.x[5])
-    print("pg =", res.x[1])
-    print("epsilon =", res.x[0])
+    #print("tb1 =", res.x[4], 'tb2=', res.x[5])
+    #print("pg =", res.x[1])
+    #print("epsilon =", res.x[0])
     outputs = {1: res.x[2], 2: res.x[3], 'bat': res.x[6]}
     print("p1, p2, pbat ", outputs)
+
     return outputs
 
 

@@ -77,9 +77,15 @@ def new_resolution(y, step, days):
     return new_y
 
 
-def get_hot_water_usage_simu():
+'''def get_hot_water_usage_simu():
     df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,1])
     hot_water_usage = df['Hot water usage (litres)'].to_numpy()/2  /(10*60/SIMU_TIMESTEP) # data is in [litres*10min]    # divided by 3 for test purposes
+    hot_water_usage = new_resolution(hot_water_usage, SIMU_TIMESTEP, len(hot_water_usage)*10/(60*24))
+    return hot_water_usage'''
+
+def get_hot_water_usage_simu():
+    df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,2])
+    hot_water_usage = df['Actual'].to_numpy()/2  /(10*60/SIMU_TIMESTEP) # data is in [litres*10min]    # divided by 3 for test purposes
     hot_water_usage = new_resolution(hot_water_usage, SIMU_TIMESTEP, len(hot_water_usage)*10/(60*24))
     return hot_water_usage
 
@@ -106,7 +112,6 @@ def on_message_boiler(client, userdata, msg):
 
 def message_handler(client, msg):
     if msg.topic == 'boiler1_actuator':
-        #print("msg.payload ", msg.payload)
         boiler1.power = float(msg.payload)
         boiler1.control_received = True
 
@@ -114,7 +119,6 @@ def message_handler(client, msg):
 if __name__ == '__main__':
 
     time.sleep(2)
-    print('Instantiating boiler 1 entity!')
     r = random.randrange(1, 100000)
     cname = "Boiler1-" + str(r)     # broker doesn't like when two clients with same name connect
     boiler1 = Boiler(cname, SIMU_TIMESTEP, BOILER1_RATED_P, BOILER1_TEMP_MIN, BOILER1_TEMP_MAX, BOILER1_INITIAL_TEMP)
@@ -125,7 +129,6 @@ if __name__ == '__main__':
 
     for t in SIMU_STEPS:
         if not (boiler1.time % CONTROL_TIMESTEP):
-            #print('waiting for boiler 1 to receive control. boiler1 time:', boiler1.time_step)
             while not boiler1.control_received:
                 time.sleep(0.001)
         boiler1.client.publish('boiler1_sensor/temp', boiler1.current_temp)
