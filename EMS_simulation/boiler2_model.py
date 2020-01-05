@@ -23,7 +23,9 @@ BOILER2_TEMP_INCOMING_WATER = 20  # in degree celsius
 BOILER2_RATED_P = -7600         # in Watts
 BOILER2_VOLUME = 800            # in litres
 BOILER2_INITIAL_TEMP = 30       # in degree celsius
-C_BOILER = 1 / (4.186 * 997 * BOILER2_VOLUME)     # in [C/(Watt*sec)]
+d_WATER = 977
+C_WATER = 4.186
+C_BOILER1 =  C_WATER * d_WATER * BOILER2_VOLUME    # in [C/(Watt*sec)]
 
 broker_address ="mqtt.teserakt.io"   # use external broker (alternative broker address: "test.mosquitto.org")
 #broker_address ="test.mosquitto.org"   # use external broker (alternative broker address: "mqtt.teserakt.io")
@@ -39,6 +41,7 @@ class Boiler():
         self.current_temp = current_temp
         self.power = 0
         self.hot_water_usage = get_hot_water_usage_simu()
+        self.energy_hot_water = get_energy_hot_water_usage_simu()
         self.client = self.setup_client()
         self.time_step = 0
         self.time = 0
@@ -49,10 +52,10 @@ class Boiler():
 
     def model(self):
         # T[h+1] = A * T[h] + C * P[h] + D * T_inlet[h]
-        A = 1 - self.hot_water_usage[self.time_step] / BOILER2_VOLUME
-        D = self.hot_water_usage[self.time_step] / BOILER2_VOLUME
-        self.current_temp = A * self.current_temp - C_BOILER * self.dt * self.power + D * BOILER2_TEMP_INCOMING_WATER
-
+        volume_required = self.energy_hot_water[self.time_step] / (C_WATER*d_WATER * self.current_temp)
+        D = volume_required / BOILER2_VOLUME
+        A = 1 - D
+        self.current_temp = A * self.current_temp - (1/C_BOILER1) * self.dt * self.power + D * BOILER2_TEMP_INCOMING_WATER
         self.time_step += 1
         self.time += self.dt
 
@@ -84,6 +87,15 @@ def get_hot_water_usage_simu():
     hot_water_usage = df['Actual'].to_numpy()/2  /(10*60/SIMU_TIMESTEP) # data is in [litres*10min]    # divided by 3 for test purposes
     hot_water_usage = new_resolution(hot_water_usage, SIMU_TIMESTEP, len(hot_water_usage)*10/(60*24))
     return hot_water_usage
+
+
+def get_energy_hot_water_usage_simu():
+    df = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,2])
+    hot_water_usage = df['Actual'].to_numpy()/2  /(10*60/SIMU_TIMESTEP) # data is in [litres*10min]    # divided by 3 for test purposes
+    hot_water_usage = new_resolution(hot_water_usage, SIMU_TIMESTEP, len(hot_water_usage)*10/(60*24))
+    # Energy : [L * g/L * W*s/(g*K) * K] # we use 40 degrees for conversion
+    water_energy_usage = hot_water_usage * d_WATER * C_WATER * 40
+    return water_energy_usage
 
 
 # callback functions for communication

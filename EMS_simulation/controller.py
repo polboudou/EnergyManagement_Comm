@@ -24,33 +24,18 @@ HORIZON = 1440*60  # in seconds, corresponds to 24 hours
 #HORIZON = 20*60  # for testing purposes
 MPC_START_TIME = '05.01.2018 00:00:00'  # pandas format mm.dd.yyyy hh:mm:ss
 SIMU_TIMESTEP = 30
-CONTROL_TIMESTEP = 10*60    # in minutes
+#CONTROL_TIMESTEP = 10*60    # in minutes
 CONTROL_TIMESTEP = 5*60    # in minutes
 
-# choose between 'Scenario0' to 'Scenario3'
+# choose between 'Scenario0', 'Scenario1', 'Scenario2', 'MPCboilers', 'MPCbattery'
 scenario = 'MPCbattery'
-#scenario = 'MPCboilers'
-#scenario = 'Scenario0'
+scenario = 'MPCboilers'
+#scenario = 'Scenario1'
 
-BOILER1_TEMP_MIN = 40  # in degree celsius
-BOILER1_TEMP_MAX = 50  # in degree celsius
-
-BOILER2_TEMP_MIN = 30  # in degree celsius
-BOILER2_TEMP_MAX = 60  # in degree celsius
-
-BOILER2_TEMP_INCOMING_WATER = 20  # in degree celsius
-BOILER1_RATED_P = -7600  # in Watts
-BOILER2_RATED_P = -7600  # in Watts
-
-BOILER1_VOLUME = 800  # in litres
-BOILER2_VOLUME = 800  # in litres
-
-BOILER1_INITIAL_TEMP = 42  # in degree celsius
-BOILER2_INITIAL_TEMP = 36  # in degree celsius
+d_WATER = 977
+C_WATER = 4.186
 
 CONTROL_STEPS = range(0, int(HORIZON/SIMU_TIMESTEP), int(CONTROL_TIMESTEP/SIMU_TIMESTEP))
-#CONTROL_STEPS = range(int(HORIZON/CONTROL_TIMESTEP))
-
 
 SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP)-10)
 
@@ -174,14 +159,22 @@ def get_excess_power_simulation(p_x_forecast):
 
     return p_x
 
-def get_hot_water_usage():
+'''def get_hot_water_usage():
 
     measured = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0],
                        usecols=[0, 2])
     actual = measured['Actual'].to_numpy()/ (10 / (CONTROL_TIMESTEP/60)) / 2
     actual = np.repeat(actual, int(10 / (CONTROL_TIMESTEP/60)))
-    return actual.tolist()
+    return actual.tolist()'''
 
+def get_energy_hot_water_usage_simu():
+    measured = pd.read_excel('data_input/hot_water_consumption_artificial_profile_10min_granularity.xlsx', index_col=[0], usecols=[0,2])
+    hot_water_usage = measured['Actual'].to_numpy()/2  /(10 / (CONTROL_TIMESTEP/60)) # data is in [litres/10min]    # divided by 2 cause two boilers, with same consumption
+    hot_water_usage = np.repeat(hot_water_usage, int(10 / (CONTROL_TIMESTEP/60)))
+    #hot_water_usage = new_resolution(hot_water_usage, SIMU_TIMESTEP, len(hot_water_usage)*10/(60*24))
+    # Energy : [L*30s * g/L * W*s/(g*K)] # we assume 40 degrees for the conversion
+    water_energy_usage = hot_water_usage * C_WATER * d_WATER * 40
+    return water_energy_usage.tolist()
 
 def get_energy_sell_price():
     df = pd.read_excel('data_input/energy_sell_price_10min_granularity.xlsx', index_col=[0], usecols=[0, 1])
@@ -262,7 +255,7 @@ if __name__ == '__main__':
     buy_price = get_energy_buy_price()
     p_x = get_excess_power_forecast()
     p_x_measured = get_excess_power_simulation(p_x)
-    hot_water_use = get_hot_water_usage()
+    energy_hot_water_use = get_energy_hot_water_usage_simu()
 
     # wait until other entities are instantiated
     while controller.Tb1 == 0 or controller.Tb2 == 0:
@@ -276,7 +269,7 @@ if __name__ == '__main__':
         print("controller period at", h, 'min')
         time.sleep(0.1*(CONTROL_TIMESTEP/SIMU_TIMESTEP))
         print("len(controller.pb1), len(controller.Tb2) ", len(controller.pb1_list), len(controller.Tb2_list))
-        actions = controller.run_algorithm(p_x_measured[h], hot_water_use[int(h/(CONTROL_TIMESTEP/SIMU_TIMESTEP))])
+        actions = controller.run_algorithm(p_x_measured[h], energy_hot_water_use[int(h/(CONTROL_TIMESTEP/SIMU_TIMESTEP))])
 
         controller.client.publish('boiler1_actuator', str(actions[1]))
         controller.client.publish('boiler2_actuator', str(actions[2]))
@@ -300,7 +293,7 @@ if __name__ == '__main__':
     print("p_bat_list = ", controller.p_bat_list)
     print("p_x_forecast = ", p_x.tolist())
     print("p_x_measured = ", p_x_measured)
-    print("hot_water_use = ", hot_water_use)
+    print("hot_water_use = ", energy_hot_water_use)
 
     # compute cost of the simulated power exchange with the grid
     cost = 0
