@@ -15,4 +15,4 @@ When running a simulation, results will go to folder 'EMS_simulation/results_out
 
 **Changing control strategy:** The control strategy is to be selected in *controller.py*. If it requires a battery, this needs to be notified in *simulation.py*, by setting *BATTERY = True*. 
 
-**Changing simulation parameters:** Simulation parameters need to be adjusted in each of the modules composing the simulation. For instance, if the control period wants to be set a 10 minutes, it set that way in *controller.py*, but also in entities model (*battery_model.py, boiler1_model.py, boiler2_model.py*).
+**Changing simulation parameters:** Simulation parameters need to be adjusted in each of the modules composing the simulation. For instance, if the control period wants to be set a 10 minutes, it has to be set that way in *controller.py*, but also in entities model (*battery_model.py, boiler1_model.py, boiler2_model.py*).
