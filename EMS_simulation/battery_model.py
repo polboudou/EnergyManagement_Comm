@@ -1,29 +1,23 @@
 #!/usr/bin/env python3
 
 import random
-import numpy as np
-from scipy import interpolate
-import paho.mqtt.client as mqtt # import the client
+import paho.mqtt.client as mqtt
 import time
 
-SIMU_TIMESTEP = 30  # in minutes
-CONTROL_TIMESTEP = 10*60   # in minutes
-CONTROL_TIMESTEP = 5*60   # in minutes
-HORIZON = 1440*60  # in minutes, corresponds to 24 hours
-#HORIZON = 720*60  # for testing purposes
-#HORIZON = 20*60  # for testing purposes
+## =========================    SIMULATION PARAMETERS    =============================== ##
+SIMU_TIMESTEP = 30                                  # in seconds
+CONTROL_TIMESTEP = 5*60                             # in seconds
+HORIZON = 1440*60                                   # in seconds, corresponds to 24 hours
+## ==================================================================================== ##
 
 SIMU_STEPS = range(int(HORIZON/SIMU_TIMESTEP))
 
-
-SOC_MAX = 5000             # Max State-of-Charge battery (Wh)
-SOC_MIN = 200           # Min State-of-Charge battery (Wh)
-PMAX_CH = -5000            # Max battery charging power (W)
-PMAX_DISCH = 5000          # Max battery discharging power (W)
+SOC_MAX = 5000                                      # Max State-of-Charge battery (Wh)
+SOC_MIN = 200                                       # Min State-of-Charge battery (Wh)
+PMAX_CH = -5000                                     # Max battery charging power (W)
+PMAX_DISCH = 5000                                   # Max battery discharging power (W)
 
 broker_address ="mqtt.teserakt.io"   # use external broker (alternative broker address: "test.mosquitto.org")
-#broker_address ="test.mosquitto.org"   # use external broker (alternative broker address: "mqtt.teserakt.io")
-
 
 
 class Battery():
@@ -54,7 +48,7 @@ class Battery():
         client.on_disconnect = on_disconnect
         client.on_message = on_message_battery
         client.connect(broker_address)
-        client.loop_start()  # without the loop, the call back functions dont get processed
+        client.loop_start()  # without the loop, the call back functions don't get processed
         return client
 
 # callback functions for communication
@@ -85,21 +79,21 @@ def message_handler(client, msg):
 
 if __name__ == '__main__':
 
-    # instatiating battery and connecting to controller
+    # instantiating battery and connecting to controller
     time.sleep(2)
     r = random.randrange(1, 100000)
-    cname = "Battery_" + str(r)     # broker doesn't like when two clients with same name connect
+    cname = "Battery_" + str(r)     # add randomness to name to avoid having two clients with same name
     battery = Battery(cname, SIMU_TIMESTEP, PMAX_CH, PMAX_DISCH, SOC_MIN, SOC_MAX, current_soc=SOC_MIN)
     battery.client.subscribe('batteryMS')
-    time.sleep(2)
-
+    time.sleep(2)   # wait to ensure that controller has subscribed to battery
+    # publish first message which simulates measurements prior to t=0:
     battery.client.publish('battery/power', battery.current_power)
     battery.client.publish('battery/soc', battery.current_soc)
 
     # with the simulation frequency, update model and send state to controller
     for t in SIMU_STEPS:
-        if not (battery.time_step % CONTROL_TIMESTEP):
-            while not battery.control_received:
+        if not (battery.time_step % CONTROL_TIMESTEP): # only true when model timestep is a multiple of control period
+            while not battery.control_received:        # in that case, model waits for control period
                 time.sleep(0.001)
         battery.client.publish('battery/soc', battery.current_soc)
         time.sleep(0.0001)
