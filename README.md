@@ -1,5 +1,6 @@
 # Semester project: "Energy management strategies for reducing a building’s electricity costs after a PV installation"
-This repository contains the material of my semester project at EPFL's Laboratory for Communications and Applications (LCA).
+
+Author: Pol Boudou Perez. This repository contains the material of a semester project at EPFL's Laboratory for Communications and Applications (LCA).
 
 Several control strategies are tested to reduce the electricity bill of a microgrid. Those are tested using a framework that simulates the different microgrid entities (boilers and battery) and the controller. All scripts are coded using Python 3 and can be found in the folder *EMS_simulation*. The different control algorithms are available in *'\EMS_simulation/control_algorithms'*.
 
